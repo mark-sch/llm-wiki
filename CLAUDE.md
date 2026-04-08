@@ -17,6 +17,9 @@ wiki/          YOU OWN THIS. LLM-generated pages that summarise, cross-reference
   entities/        People, companies, projects, products (TitleCase.md).
   concepts/        Ideas, frameworks, methods, theories (TitleCase.md).
   syntheses/       Saved query answers (kebab-case slug).
+  comparisons/     Side-by-side diffs of two or more entities/concepts (kebab-case slug). [v0.2+]
+  questions/       First-class open questions with state tracking (kebab-case slug). [v0.2+]
+  archive/         Deprecated / demoted pages preserved for history. [v0.2+]
 
 site/          GENERATED. Static HTML from `python3 -m llmwiki build`. Do not edit by hand.
 ```
@@ -31,6 +34,9 @@ site/          GENERATED. Static HTML from `python3 -m llmwiki build`. Do not ed
 | `/wiki-lint` | Find orphans, broken links, stale pages | Executes the Lint Workflow below |
 | `/wiki-build` | Regenerate the static HTML site | Runs `python3 -m llmwiki build` |
 | `/wiki-serve` | Start the local HTTP server | Runs `python3 -m llmwiki serve` |
+| `/wiki-update` | Update one wiki page in place (v0.2+) | Surgical edit of one page without re-ingest |
+| `/wiki-graph` | Build the knowledge graph (v0.2+) | Walks `[[wikilinks]]` → `graph/graph.json` + `graph.html` |
+| `/wiki-reflect` | Higher-order self-reflection over the wiki (v0.2+) | Finds gaps, patterns, and suggests new pages |
 
 ## Ingest Workflow
 
