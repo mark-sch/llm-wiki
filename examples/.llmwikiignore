@@ -1,0 +1,36 @@
+# .llmwikiignore — example file
+#
+# Copy this to the repo root as `.llmwikiignore` and edit to your taste.
+#
+# Gitignore-style patterns. One per line. `#` for comments.
+# Lines starting with `!` are negations (re-include a match).
+# Trailing `/` means the pattern only matches the project slug (not filenames).
+#
+# Each .llmwikiignore line is matched against:
+#   1. The project slug           (e.g. `ai-newsletter`)
+#   2. The session filename       (e.g. `2026-04-04-clever-munching-parnas.md`)
+#   3. The composite path         (e.g. `ai-newsletter/2026-04-04-clever-munching-parnas.md`)
+
+# ─── Whole-project excludes ───────────────────────────────────────────────
+# Skip entire projects by matching the slug with a trailing slash.
+# confidential-client/
+# prototype-scratch/
+
+# ─── Date-based excludes ──────────────────────────────────────────────────
+# Skip anything older than a specific month
+# *2024-*
+# *2025-0[1-6]-*
+
+# ─── Filename excludes ────────────────────────────────────────────────────
+# Skip scratch / exit-only / local-command-only sessions
+# *-scratch.md
+# *-exit.md
+
+# ─── Negations — re-include specific sessions ─────────────────────────────
+# Ignore a whole project but keep one specific session in it
+# confidential-client/
+# !confidential-client/public-2026-*
+
+# ─── Example for the llmwiki repo itself ─────────────────────────────────
+# (Uncomment if you want to exclude the llm-wiki's own sessions from itself.)
+# llm-wiki/

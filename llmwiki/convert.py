@@ -22,6 +22,7 @@ from llmwiki.adapters import REGISTRY, discover_adapters
 DEFAULT_STATE_FILE = REPO_ROOT / ".llmwiki-state.json"
 DEFAULT_CONFIG_FILE = REPO_ROOT / "examples" / "sessions_config.json"
 DEFAULT_OUT_DIR = REPO_ROOT / "raw" / "sessions"
+DEFAULT_IGNORE_FILE = REPO_ROOT / ".llmwikiignore"
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "filters": {
@@ -87,6 +88,108 @@ def load_state(path: Path) -> dict[str, float]:
 def save_state(path: Path, state: dict[str, float]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+
+# ─── .llmwikiignore ───────────────────────────────────────────────────────
+
+
+class IgnoreMatcher:
+    """Gitignore-style pattern matcher for `.llmwikiignore`.
+
+    Patterns are read from one file (typically `.llmwikiignore` at the repo
+    root). Each non-empty, non-comment line is a pattern. A pattern is matched
+    against the project slug, the session filename, and the `<project>/<name>`
+    composite.
+
+    Supports:
+      - `#` for line comments
+      - `!pattern` for negation (a negated pattern re-includes a previously
+        excluded match)
+      - `*`, `?`, `[abc]` glob metacharacters via fnmatch
+      - `**` matches any number of path segments (any substring)
+      - Trailing `/` marks a pattern as directory-only (matches project slugs)
+    """
+
+    def __init__(self, patterns: list[str]):
+        # Each entry is (glob_pattern, is_negation, dir_only)
+        self._rules: list[tuple[str, bool, bool]] = []
+        for raw in patterns:
+            raw = raw.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            negate = raw.startswith("!")
+            if negate:
+                raw = raw[1:]
+            dir_only = raw.endswith("/")
+            if dir_only:
+                raw = raw[:-1]
+            self._rules.append((raw, negate, dir_only))
+
+    @classmethod
+    def from_file(cls, path: Path) -> "IgnoreMatcher":
+        if not path.exists():
+            return cls([])
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return cls([])
+        return cls(text.splitlines())
+
+    @staticmethod
+    def _match_one(pattern: str, target: str) -> bool:
+        """Match a single pattern against a target string.
+
+        We emulate gitignore-ish behaviour with stdlib fnmatch, extended to
+        handle `**` by translating it to `*` and also matching the pattern
+        against any path suffix.
+        """
+        import fnmatch
+
+        # Normalize path separators
+        target = target.replace("\\", "/")
+        pattern_norm = pattern.replace("\\", "/")
+        # `**` means "any number of path segments" — collapse to `*` for fnmatch
+        fn_pattern = pattern_norm.replace("**", "*")
+        if fnmatch.fnmatch(target, fn_pattern):
+            return True
+        # Also allow matching against any suffix of the target so `foo/*.md`
+        # matches `raw/sessions/foo/bar.md`.
+        parts = target.split("/")
+        for i in range(len(parts)):
+            suffix = "/".join(parts[i:])
+            if fnmatch.fnmatch(suffix, fn_pattern):
+                return True
+        # And bare basename match so `*.tmp` matches any file named *.tmp
+        base = parts[-1] if parts else target
+        if fnmatch.fnmatch(base, fn_pattern):
+            return True
+        return False
+
+    def is_ignored(self, *, project: str, filename: str) -> bool:
+        """Return True if the (project, filename) pair should be skipped.
+
+        The composite path `<project>/<filename>` is matched too so patterns
+        like `confidential-client/` or `ai-newsletter/2026-04-04-*` work.
+        """
+        composite = f"{project}/{filename}"
+        ignored = False
+        for pattern, negate, dir_only in self._rules:
+            targets: list[str] = [composite, filename, project]
+            matched = any(self._match_one(pattern, t) for t in targets)
+            if not matched:
+                continue
+            if dir_only and not self._match_one(pattern, project):
+                # Directory-only rule but the match came from the filename —
+                # skip this rule.
+                continue
+            ignored = not negate
+        return ignored
+
+    def __bool__(self) -> bool:
+        return bool(self._rules)
+
+    def __len__(self) -> int:
+        return len(self._rules)
 
 
 # ─── parsing ───────────────────────────────────────────────────────────────
@@ -495,6 +598,7 @@ def convert_all(
     out_dir: Path = DEFAULT_OUT_DIR,
     state_file: Path = DEFAULT_STATE_FILE,
     config_file: Path = DEFAULT_CONFIG_FILE,
+    ignore_file: Path = DEFAULT_IGNORE_FILE,
     since: Optional[str] = None,
     project: Optional[str] = None,
     include_current: bool = False,
@@ -505,6 +609,9 @@ def convert_all(
     config = load_config(config_file)
     state = {} if force else load_state(state_file)
     redact = Redactor(config)
+    ignore = IgnoreMatcher.from_file(ignore_file)
+    if ignore:
+        print(f"==> loaded {len(ignore)} pattern(s) from {ignore_file.name}")
 
     drop_types = config.get("filters", {}).get("drop_record_types", [])
     live_minutes = config.get("filters", {}).get("live_session_minutes", 60)
@@ -533,17 +640,20 @@ def convert_all(
         print("No adapters available. Install Claude Code or Codex CLI first.", file=sys.stderr)
         return 1
 
-    converted = unchanged = live = filtered = errors = 0
+    converted = unchanged = live = filtered = ignored_count = errors = 0
 
     for cls in selected:
         adapter = cls(config)
         print(f"==> adapter: {cls.name}")
         sessions = adapter.discover_sessions()
-        print(f"  discovered: {len(sessions)} .jsonl files")
+        print(f"  discovered: {len(sessions)} source files")
         for path in sessions:
             project_slug = adapter.derive_project_slug(path)
             if project and project not in project_slug:
                 filtered += 1
+                continue
+            if ignore and ignore.is_ignored(project=project_slug, filename=path.name):
+                ignored_count += 1
                 continue
             try:
                 mtime = path.stat().st_mtime
@@ -554,6 +664,29 @@ def convert_all(
             if state.get(key) == mtime:
                 unchanged += 1
                 continue
+
+            # Markdown-source adapters (e.g. Obsidian) route through a simple
+            # copy-with-redaction path rather than parse_jsonl.
+            if path.suffix == ".md":
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except OSError:
+                    errors += 1
+                    continue
+                if len(text) < 50:
+                    filtered += 1
+                    continue
+                out_name = path.stem + ".md"
+                out_path = out_dir / project_slug / out_name
+                if dry_run:
+                    print(f"  [dry-run] {out_path.relative_to(REPO_ROOT) if out_path.is_relative_to(REPO_ROOT) else out_path} ({len(text)} bytes)")
+                else:
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text(redact(text), encoding="utf-8")
+                    state[key] = mtime
+                converted += 1
+                continue
+
             records = parse_jsonl(path)
             records = filter_records(records, drop_types)
             if not records:
@@ -590,6 +723,6 @@ def convert_all(
     print()
     print(
         f"summary: {converted} converted, {unchanged} unchanged, "
-        f"{live} live, {filtered} filtered, {errors} errors"
+        f"{live} live, {filtered} filtered, {ignored_count} ignored, {errors} errors"
     )
     return 0 if errors == 0 else 1
