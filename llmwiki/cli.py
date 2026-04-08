@@ -126,6 +126,22 @@ def cmd_export_obsidian(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_eval(args: argparse.Namespace) -> int:
+    """Run the structural eval battery over wiki/."""
+    from llmwiki.eval import main as eval_main
+    # Forward the sub-args cleanly
+    sub_argv: list[str] = []
+    if args.check:
+        sub_argv.extend(["--check"] + args.check)
+    if args.json:
+        sub_argv.append("--json")
+    if args.out:
+        sub_argv.extend(["--out", str(args.out)])
+    if args.fail_below:
+        sub_argv.extend(["--fail-below", str(args.fail_below)])
+    return eval_main(sub_argv)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="llmwiki",
@@ -188,6 +204,14 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--clean", action="store_true", help="Delete the target subfolder before copying")
     exp.add_argument("--dry-run", action="store_true")
     exp.set_defaults(func=cmd_export_obsidian)
+
+    # eval
+    ev = sub.add_parser("eval", help="Run structural eval checks over wiki/")
+    ev.add_argument("--check", nargs="*", help="Run only these named checks")
+    ev.add_argument("--json", action="store_true", help="Print JSON to stdout")
+    ev.add_argument("--out", type=Path, default=None, help="Write JSON report to this path")
+    ev.add_argument("--fail-below", type=int, default=0, help="Exit non-zero if score %% < this")
+    ev.set_defaults(func=cmd_eval)
 
     # version
     ver = sub.add_parser("version", help="Print version")
