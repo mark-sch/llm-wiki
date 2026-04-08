@@ -1,0 +1,61 @@
+"""Tests for the adapter registry."""
+
+from __future__ import annotations
+
+from llmwiki.adapters import REGISTRY, discover_adapters
+from llmwiki.adapters.base import BaseAdapter
+from llmwiki.adapters.claude_code import ClaudeCodeAdapter
+from llmwiki.adapters.codex_cli import CodexCliAdapter
+from llmwiki.adapters.obsidian import ObsidianAdapter
+
+
+def test_registry_discovers_all_adapters():
+    discover_adapters()
+    assert "claude_code" in REGISTRY
+    assert "codex_cli" in REGISTRY
+    assert "obsidian" in REGISTRY
+
+
+def test_all_adapters_subclass_base():
+    assert issubclass(ClaudeCodeAdapter, BaseAdapter)
+    assert issubclass(CodexCliAdapter, BaseAdapter)
+    assert issubclass(ObsidianAdapter, BaseAdapter)
+
+
+def test_all_adapters_have_name():
+    discover_adapters()
+    for name, cls in REGISTRY.items():
+        assert cls.name == name, f"adapter {cls.__name__} name mismatch"
+
+
+def test_all_adapters_have_description():
+    discover_adapters()
+    for cls in REGISTRY.values():
+        desc = cls.description()
+        assert isinstance(desc, str)
+        assert len(desc) > 0
+
+
+def test_claude_code_project_slug_stripping():
+    """derive_project_slug should strip the common '-Users-...-draft-' prefix."""
+    from pathlib import Path
+
+    adapter = ClaudeCodeAdapter()
+    # Fake a path that looks like what Claude Code writes
+    p = (
+        adapter.session_store_path
+        / "-Users-alice-Desktop-2026-production-draft-ai-newsletter"
+        / "abc-def.jsonl"
+    )
+    slug = adapter.derive_project_slug(p)
+    assert slug == "ai-newsletter"
+
+
+def test_claude_code_project_slug_fallback():
+    from pathlib import Path
+
+    adapter = ClaudeCodeAdapter()
+    # Path that doesn't match the expected pattern
+    p = adapter.session_store_path / "random-project" / "s.jsonl"
+    slug = adapter.derive_project_slug(p)
+    assert slug  # any non-empty string is acceptable
