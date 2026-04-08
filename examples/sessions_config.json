@@ -1,0 +1,35 @@
+{
+  "_comment": "Copy this file to ./config.json (gitignored) and edit to your taste.",
+
+  "filters": {
+    "live_session_minutes": 60,
+    "include_projects": [],
+    "exclude_projects": [],
+    "drop_record_types": [
+      "queue-operation",
+      "file-history-snapshot",
+      "progress"
+    ]
+  },
+
+  "redaction": {
+    "_comment": "Set real_username to the part of your home path to replace. Auto-detected from $USER if empty.",
+    "real_username": "",
+    "replacement_username": "USER",
+    "extra_patterns": [
+      "(?i)(api[_-]?key|secret|token|bearer|password)[\"'\\s:=]+[\\w\\-\\.]{8,}",
+      "sk-[A-Za-z0-9]{20,}",
+      "[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+"
+    ]
+  },
+
+  "truncation": {
+    "tool_result_chars": 500,
+    "bash_stdout_lines": 5,
+    "write_content_preview_lines": 5,
+    "user_prompt_chars": 4000,
+    "assistant_text_chars": 8000
+  },
+
+  "drop_thinking_blocks": true
+}

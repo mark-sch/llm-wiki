@@ -1,0 +1,113 @@
+# llmwiki — git ignore rules
+#
+# Goal: commit ONLY framework files. All user data and generated output stays local.
+
+# ─── User data (never committed) ──────────────────────────────────────────
+# Session transcripts converted from the agent's .jsonl files. These are
+# user-specific and often contain personally-identifying information even
+# after redaction. Never commit.
+raw/sessions/
+raw/
+!raw/.gitkeep
+
+# LLM-generated wiki pages (Karpathy layer 2). Generated locally from raw/.
+wiki/sources/
+wiki/entities/
+wiki/concepts/
+wiki/syntheses/
+wiki/index.md
+wiki/overview.md
+wiki/log.md
+wiki/lint-report.md
+!wiki/.gitkeep
+!wiki/README.md
+
+# Generated static HTML site (Karpathy layer 3).
+site/
+site-html/
+dist-site/
+!site/.gitkeep
+
+# Converter state — tracks mtimes to avoid re-processing unchanged files.
+.ingestion-state.json
+.llmwiki-state.json
+
+# Local config (user-specific).
+config.json
+config.local.json
+.env
+.env.local
+
+# Logs
+*.log
+/tmp/llmwiki-*.log
+
+# ─── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ─── Editors & OS ─────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── Claude Code / agent local state ──────────────────────────────────────
+# NEVER commit .claude/ or .codex/ LOCAL settings (they leak machine paths).
+# We DO commit .claude/commands/ and .claude/skills/ (framework-level).
+.claude/settings.local.json
+.claude/projects/
+.claude/cache/
+.codex/sessions/
+.codex/cache/
+
+# ─── Personal framework reference (local-only) ───────────────────────────
+# Pratiyush's Open Source Framework v4.0 notes — kept here for reference
+# while building but NOT committed (personal process docs).
+.framework/
+
+# ─── Research corpus (local-only) ────────────────────────────────────────
+# Cloned reference implementations for Phase 1.25 Research. Pulled from
+# Karpathy's gist and related searches. Never committed — respect upstream
+# licenses and keep the repo lean.
+.temp/
+.research/
