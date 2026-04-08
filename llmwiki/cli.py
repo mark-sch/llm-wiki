@@ -4,12 +4,15 @@ Usage:
     python3 -m llmwiki <subcommand> [options]
 
 Subcommands:
-    init       Scaffold raw/, wiki/, site/ directories
-    sync       Convert new .jsonl sessions to markdown
-    build      Compile static HTML site from raw/ + wiki/
-    serve      Start local HTTP server
-    adapters   List available session-store adapters
-    version    Print version and exit
+    init              Scaffold raw/, wiki/, site/ directories
+    sync              Convert new .jsonl sessions to markdown
+    build             Compile static HTML site from raw/ + wiki/
+    serve             Start local HTTP server
+    graph             Build the knowledge graph (graph/graph.json + graph.html)
+    watch             Watch agent session stores and auto-sync on change
+    export-obsidian   Export the compiled wiki into an Obsidian vault
+    adapters          List available session-store adapters
+    version           Print version and exit
 """
 
 from __future__ import annotations
@@ -93,6 +96,36 @@ def cmd_adapters(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_graph(args: argparse.Namespace) -> int:
+    """Build the knowledge graph from wiki/ wikilinks."""
+    from llmwiki.graph import build_and_report
+    write_json = args.format in ("json", "both")
+    write_html = args.format in ("html", "both")
+    return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Watch agent session stores and auto-sync on change."""
+    from llmwiki.watch import watch as run_watch
+    return run_watch(
+        adapters=args.adapter,
+        interval=args.interval,
+        debounce=args.debounce,
+        dry_run=args.dry_run,
+    )
+
+
+def cmd_export_obsidian(args: argparse.Namespace) -> int:
+    """Export the compiled wiki into an Obsidian vault."""
+    from llmwiki.obsidian_output import export_to_vault
+    return export_to_vault(
+        vault=args.vault,
+        subfolder=args.subfolder,
+        dry_run=args.dry_run,
+        clean=args.clean,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="llmwiki",
@@ -134,6 +167,27 @@ def build_parser() -> argparse.ArgumentParser:
     # adapters
     ads = sub.add_parser("adapters", help="List available adapters")
     ads.set_defaults(func=cmd_adapters)
+
+    # graph
+    graph = sub.add_parser("graph", help="Build the knowledge graph (graph/graph.json + graph.html)")
+    graph.add_argument("--format", choices=["json", "html", "both"], default="both")
+    graph.set_defaults(func=cmd_graph)
+
+    # watch
+    watch = sub.add_parser("watch", help="Watch agent session stores and auto-sync on change")
+    watch.add_argument("--adapter", nargs="*", help="Adapter(s) to watch; default: all available")
+    watch.add_argument("--interval", type=float, default=5.0, help="Polling interval seconds")
+    watch.add_argument("--debounce", type=float, default=10.0, help="Debounce window seconds")
+    watch.add_argument("--dry-run", action="store_true")
+    watch.set_defaults(func=cmd_watch)
+
+    # export-obsidian
+    exp = sub.add_parser("export-obsidian", help="Export compiled wiki into an Obsidian vault")
+    exp.add_argument("--vault", type=str, required=True, help="Path to the Obsidian vault root")
+    exp.add_argument("--subfolder", type=str, default="LLM Wiki", help="Subfolder name inside the vault")
+    exp.add_argument("--clean", action="store_true", help="Delete the target subfolder before copying")
+    exp.add_argument("--dry-run", action="store_true")
+    exp.set_defaults(func=cmd_export_obsidian)
 
     # version
     ver = sub.add_parser("version", help="Print version")
