@@ -129,7 +129,6 @@ def cmd_export_obsidian(args: argparse.Namespace) -> int:
 def cmd_eval(args: argparse.Namespace) -> int:
     """Run the structural eval battery over wiki/."""
     from llmwiki.eval import main as eval_main
-    # Forward the sub-args cleanly
     sub_argv: list[str] = []
     if args.check:
         sub_argv.extend(["--check"] + args.check)
@@ -140,6 +139,92 @@ def cmd_eval(args: argparse.Namespace) -> int:
     if args.fail_below:
         sub_argv.extend(["--fail-below", str(args.fail_below)])
     return eval_main(sub_argv)
+
+
+def cmd_check_links(args: argparse.Namespace) -> int:
+    """Verify every internal link in site/ resolves to an existing file."""
+    from llmwiki.link_checker import main as link_main
+    sub_argv: list[str] = []
+    if args.site_dir:
+        sub_argv.extend(["--site-dir", str(args.site_dir)])
+    if args.fail_on_broken:
+        sub_argv.append("--fail-on-broken")
+    if args.limit:
+        sub_argv.extend(["--limit", str(args.limit)])
+    return link_main(sub_argv)
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """Export AI-consumable formats from the compiled wiki."""
+    import sys as _sys
+    from llmwiki.exporters import (
+        write_llms_txt,
+        write_llms_full_txt,
+        write_graph_jsonld,
+        write_sitemap,
+        write_rss,
+        write_robots_txt,
+        write_ai_readme,
+        export_all,
+    )
+    from llmwiki.build import discover_sources, group_by_project, RAW_SESSIONS
+
+    out_dir = args.out if args.out else REPO_ROOT / "site"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    sources = discover_sources(RAW_SESSIONS)
+    if not sources:
+        print("error: no sources found. Run 'llmwiki sync' first.", file=_sys.stderr)
+        return 2
+    groups = group_by_project(sources)
+
+    format_ = args.format
+    if format_ == "all":
+        paths = export_all(out_dir, groups, sources)
+        for name, p in sorted(paths.items()):
+            print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
+        return 0
+
+    mapping = {
+        "llms-txt": lambda: write_llms_txt(out_dir, groups, len(sources)),
+        "llms-full-txt": lambda: write_llms_full_txt(out_dir, sources),
+        "jsonld": lambda: write_graph_jsonld(out_dir, groups, sources),
+        "sitemap": lambda: write_sitemap(out_dir, groups, sources),
+        "rss": lambda: write_rss(out_dir, sources),
+        "robots": lambda: write_robots_txt(out_dir),
+        "ai-readme": lambda: write_ai_readme(out_dir, groups, len(sources)),
+    }
+    fn = mapping.get(format_)
+    if not fn:
+        print(f"error: unknown format {format_!r}. Valid: {sorted(mapping.keys())} or 'all'", file=_sys.stderr)
+        return 2
+    p = fn()
+    print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
+    return 0
+
+
+def cmd_manifest(args: argparse.Namespace) -> int:
+    """Build a site/manifest.json with SHA-256 hashes + perf budget check."""
+    from llmwiki.manifest import write_manifest
+    site_dir = args.site_dir or (REPO_ROOT / "site")
+    if not site_dir.exists():
+        print(f"error: {site_dir} does not exist. Run 'llmwiki build' first.", file=sys.stderr)
+        return 2
+    p = write_manifest(site_dir)
+    print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
+    # Read back and show budget status
+    import json as _json
+    report = _json.loads(p.read_text(encoding="utf-8"))
+    print(f"  {report['total_files']} files, {report['total_bytes'] / 1024 / 1024:.1f} MB")
+    if report.get("budget_violations"):
+        print("  ⚠ budget violations:")
+        for v in report["budget_violations"]:
+            print(f"    {v}")
+        if args.fail_on_violations:
+            return 1
+    else:
+        print("  ✓ all perf budget targets met")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -212,6 +297,29 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--out", type=Path, default=None, help="Write JSON report to this path")
     ev.add_argument("--fail-below", type=int, default=0, help="Exit non-zero if score %% < this")
     ev.set_defaults(func=cmd_eval)
+
+    # check-links (v0.4)
+    cl = sub.add_parser("check-links", help="Verify every internal link in site/ resolves")
+    cl.add_argument("--site-dir", type=Path, default=None)
+    cl.add_argument("--fail-on-broken", action="store_true")
+    cl.add_argument("--limit", type=int, default=20)
+    cl.set_defaults(func=cmd_check_links)
+
+    # export (v0.4)
+    exp2 = sub.add_parser("export", help="Export AI-consumable formats (llms-txt, jsonld, sitemap, ...)")
+    exp2.add_argument(
+        "format",
+        choices=["llms-txt", "llms-full-txt", "jsonld", "sitemap", "rss", "robots", "ai-readme", "all"],
+        help="Export format",
+    )
+    exp2.add_argument("--out", type=Path, default=None, help="Output directory (default: site/)")
+    exp2.set_defaults(func=cmd_export)
+
+    # manifest (v0.4)
+    mf = sub.add_parser("manifest", help="Build site/manifest.json with SHA-256 hashes + perf budget check")
+    mf.add_argument("--site-dir", type=Path, default=None)
+    mf.add_argument("--fail-on-violations", action="store_true")
+    mf.set_defaults(func=cmd_manifest)
 
     # version
     ver = sub.add_parser("version", help="Print version")

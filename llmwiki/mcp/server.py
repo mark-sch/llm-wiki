@@ -149,6 +149,27 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "wiki_export",
+        "description": (
+            "Dump the entire wiki in a machine-readable format for AI agents. "
+            "Returns the requested format as text. Use 'llms-txt' for the "
+            "short llms.txt index, 'llms-full-txt' for the flattened content "
+            "dump, 'jsonld' for the schema.org JSON-LD graph, 'sitemap' for "
+            "the sitemap.xml, or 'list' to list every available export."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "type": "string",
+                    "enum": ["llms-txt", "llms-full-txt", "jsonld", "sitemap", "rss", "manifest", "list"],
+                    "description": "Which export format to return.",
+                },
+            },
+            "required": ["format"],
+        },
+    },
 ]
 
 
@@ -393,6 +414,54 @@ def tool_wiki_sync(args: dict[str, Any]) -> dict[str, Any]:
     return _ok(output or "(no output)")
 
 
+def tool_wiki_export(args: dict[str, Any]) -> dict[str, Any]:
+    """Return one of the AI-consumable export files (v0.4)."""
+    fmt = args.get("format")
+    site_dir = REPO_ROOT / "site"
+
+    if fmt == "list":
+        candidates = [
+            "llms.txt",
+            "llms-full.txt",
+            "graph.jsonld",
+            "sitemap.xml",
+            "rss.xml",
+            "robots.txt",
+            "ai-readme.md",
+            "manifest.json",
+            "search-index.json",
+        ]
+        out = []
+        for name in candidates:
+            p = site_dir / name
+            if p.exists():
+                out.append({"format": name, "size_bytes": p.stat().st_size, "url": name})
+        return _ok(json.dumps(out, indent=2))
+
+    mapping = {
+        "llms-txt": "llms.txt",
+        "llms-full-txt": "llms-full.txt",
+        "jsonld": "graph.jsonld",
+        "sitemap": "sitemap.xml",
+        "rss": "rss.xml",
+        "manifest": "manifest.json",
+    }
+    filename = mapping.get(fmt)
+    if not filename:
+        return _err(f"unknown format: {fmt}. Valid: {sorted(mapping.keys())} + 'list'")
+    p = site_dir / filename
+    if not p.exists():
+        return _err(f"{filename} does not exist. Run 'llmwiki build' first.")
+    try:
+        content = p.read_text(encoding="utf-8")
+    except OSError as e:
+        return _err(f"read error: {e}")
+    # Cap response size at 200 KB to keep MCP responses sane
+    if len(content) > 200 * 1024:
+        content = content[: 200 * 1024] + f"\n\n…(truncated at 200 KB; full file is {p.stat().st_size} bytes at /{filename})"
+    return _ok(content)
+
+
 def _ok(text: str) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": text}], "isError": False}
 
@@ -408,6 +477,7 @@ TOOL_IMPLS = {
     "wiki_read_page": tool_wiki_read_page,
     "wiki_lint": tool_wiki_lint,
     "wiki_sync": tool_wiki_sync,
+    "wiki_export": tool_wiki_export,
 }
 
 

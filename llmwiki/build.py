@@ -233,6 +233,70 @@ def page_head(title: str, description: str, css_prefix: str = "") -> str:
 """
 
 
+def page_head_article(
+    title: str,
+    description: str,
+    css_prefix: str = "",
+    canonical: str = "",
+    date: str = "",
+    metadata_comment: str = "",
+) -> str:
+    """v0.4: Extended page head for session (Article) pages with schema.org
+    microdata, canonical link, and an AI-readable metadata HTML comment."""
+    canonical_tag = ""
+    if canonical:
+        canonical_tag = f'  <link rel="canonical" href="{html.escape(canonical)}">\n'
+    og_tags = f"""  <meta property="og:type" content="article">
+  <meta property="og:title" content="{html.escape(title)}">
+  <meta property="og:description" content="{html.escape(description)}">
+"""
+    if date:
+        og_tags += f'  <meta property="article:published_time" content="{html.escape(date)}">\n'
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html.escape(title)}</title>
+  <meta name="description" content="{html.escape(description)}">
+{canonical_tag}{og_tags}  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{css_prefix}style.css">
+</head>
+<body>
+{metadata_comment}<div class="progress-bar" id="progress-bar"></div>
+"""
+
+
+def _build_metadata_comment(
+    meta: dict[str, Any],
+    slug: str,
+    project_slug: str,
+    reading_min: int,
+    html_stem: str = "",
+) -> str:
+    """An HTML comment at the top of every session page that AI agents can
+    parse without needing to fetch the separate .json sibling."""
+    fields = [
+        f"slug: {slug}",
+        f"project: {project_slug}",
+    ]
+    for key in ("date", "started", "ended", "model", "gitBranch", "permissionMode", "user_messages", "tool_calls"):
+        val = meta.get(key)
+        if val is not None:
+            fields.append(f"{key}: {val}")
+    tools = get_tools_list(meta)
+    if tools:
+        fields.append(f"tools_used: [{', '.join(tools)}]")
+    fields.append(f"reading_min: {reading_min}")
+    sibling_stem = html_stem or slug
+    fields.append(f"txt_sibling: {sibling_stem}.txt")
+    fields.append(f"json_sibling: {sibling_stem}.json")
+    body = "\n".join(fields)
+    return f"<!-- llmwiki:metadata\n{body}\n-->\n"
+
+
 def nav_bar(active: str, link_prefix: str = "") -> str:
     def link(href: str, label: str, key: str) -> str:
         cls = ' class="active"' if key == active else ""
@@ -338,6 +402,12 @@ def page_foot(js_prefix: str = "") -> str:
 
 # ─── page renderers ────────────────────────────────────────────────────────
 
+def calc_reading_time(body: str, wpm: int = 225) -> int:
+    """Estimate reading time in minutes from a markdown body."""
+    words = len(re.findall(r"\w+", body))
+    return max(1, round(words / wpm))
+
+
 def render_session(
     path: Path,
     meta: dict[str, Any],
@@ -352,6 +422,7 @@ def render_session(
     body = strip_leading_h1(body)
     body_html = md_to_html(body)
     raw_md_for_copy = html.escape(body)
+    reading_min = calc_reading_time(body)
 
     bits: list[str] = []
     if meta.get("project"):
@@ -368,6 +439,7 @@ def render_session(
         bits.append(f'{html.escape(str(meta["user_messages"]))} msgs')
     if meta.get("tool_calls"):
         bits.append(f'{html.escape(str(meta["tool_calls"]))} tools')
+    bits.append(f'<span class="muted">{reading_min} min read</span>')
     meta_strip = " · ".join(bits) if bits else ""
 
     tools_list = get_tools_list(meta)
@@ -378,11 +450,16 @@ def render_session(
             preview += f", +{len(tools_list) - 6} more"
         tools_preview = f'<div class="meta-tools muted">tools: {html.escape(preview)}</div>'
 
+    # IMPORTANT: The HTML file is named `<path.stem>.html` (e.g. date-slug),
+    # NOT `<slug>.html`. The siblings + canonical must use path.stem.
+    html_stem = path.stem
     raw_md_path = f"../../sources/{project_slug}/{path.name}"
     actions_html = f"""<div class="session-actions">
   <button class="btn btn-primary" onclick="copyMarkdown(this)">Copy as markdown</button>
   <a class="btn" href="../../projects/{html.escape(project_slug)}.html">← {html.escape(project_slug)}</a>
   <a class="btn" href="{html.escape(raw_md_path)}" download>Download .md</a>
+  <a class="btn" href="{html.escape(html_stem + '.txt')}" title="plain-text sibling for AI agents">.txt</a>
+  <a class="btn" href="{html.escape(html_stem + '.json')}" title="structured JSON sibling for AI agents">.json</a>
   <textarea class="md-source" hidden>{raw_md_for_copy}</textarea>
 </div>"""
 
@@ -394,15 +471,28 @@ def render_session(
     ]
     breadcrumbs = breadcrumbs_bar(crumbs, link_prefix="../../")
 
+    # v0.4: machine-readable metadata appendix (HTML comment that AI agents
+    # scraping HTML can parse without fetching the .json sibling).
+    metadata_comment = _build_metadata_comment(meta, slug, project_slug, reading_min, html_stem=html_stem)
+
+    # v0.4: page_head with schema.org article microdata + canonical link.
+    # Canonical is relative to the current page (same dir) so the link checker
+    # resolves it correctly whether served from a subdomain root or any path.
     page = (
-        page_head(
-            f"{title_raw} — LLM Wiki",
-            f"Session transcript from {meta.get('project', '')} on {date}",
+        page_head_article(
+            title=f"{title_raw} — LLM Wiki",
+            description=f"Session transcript from {meta.get('project', '')} on {date}",
             css_prefix="../../",
+            canonical=f"{html_stem}.html",
+            date=str(meta.get("started") or date),
+            metadata_comment=metadata_comment,
         )
         + nav_bar("sessions", link_prefix="../../")
         + hero(str(title_raw), meta_strip, size="hero-sm", subtitle_is_html=True)
-        + f'<section class="section">\n  <div class="container">\n{breadcrumbs}\n{tools_preview}\n{actions_html}\n    <article class="content">\n'
+        + f'<section class="section">\n  <div class="container">\n{breadcrumbs}\n{tools_preview}\n{actions_html}\n    <article class="content" itemscope itemtype="https://schema.org/Article">\n'
+        + f'<meta itemprop="headline" content="{html.escape(str(title_raw))}">\n'
+        + f'<meta itemprop="datePublished" content="{html.escape(str(meta.get("started") or date))}">\n'
+        + f'<meta itemprop="inLanguage" content="en">\n'
         + body_html
         + '\n    </article>\n  </div>\n</section>\n</main>\n'
         + page_foot(js_prefix="../../")
@@ -1009,6 +1099,28 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
 .footer { padding: 32px 0; border-top: 1px solid var(--border); margin-top: 48px; background: var(--bg-alt); }
 .footer p { font-size: 0.85rem; color: var(--text-muted); text-align: center; }
 
+/* v0.4: Related pages panel */
+.related-pages { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+.related-pages h3 { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 12px; }
+.related-pages ul { list-style: none; margin: 0; padding: 0; }
+.related-pages li { padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+.related-pages li:last-child { border-bottom: none; }
+
+/* v0.4: Activity heatmap */
+.activity-heatmap { margin-bottom: 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.heatmap-label { font-size: 0.78rem; margin-bottom: 8px; }
+.heatmap-cells { display: flex; flex-wrap: wrap; gap: 2px; }
+.heatmap-cells .cell { width: 12px; height: 12px; border-radius: 2px; display: inline-block; transition: transform 0.1s; }
+.heatmap-cells .cell:hover { transform: scale(1.3); z-index: 2; position: relative; }
+
+/* v0.4: Deep-link icon next to headings */
+.content h2 .deep-link, .content h3 .deep-link, .content h4 .deep-link { margin-left: 8px; font-size: 0.8em; opacity: 0; text-decoration: none; transition: opacity 0.15s; }
+.content h2:hover .deep-link, .content h3:hover .deep-link, .content h4:hover .deep-link { opacity: 0.7; }
+.content h2 .deep-link:hover, .content h3 .deep-link:hover { opacity: 1; text-decoration: none; }
+
+/* v0.4: Mark highlighting in search results */
+mark { background: var(--accent-bg); color: var(--accent); padding: 0 2px; border-radius: 3px; font-weight: 500; }
+
 /* Hover-to-preview wikilinks */
 .wikilink-preview { position: fixed; max-width: 360px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 12px 14px; z-index: 250; pointer-events: auto; font-size: 0.85rem; animation: fadeIn 0.1s ease-out; }
 .wikilink-preview .wl-title { font-weight: 600; color: var(--text); margin-bottom: 6px; }
@@ -1554,6 +1666,163 @@ document.addEventListener("DOMContentLoaded", function () {
     if (filter) container.insertBefore(tl, filter);
   });
 })();
+
+// ─── v0.4: Related pages panel ────────────────────────────────────────────
+// On a session page, find 3-5 other sessions that share wikilink targets
+// or project, and display them at the bottom under a "Related pages" heading.
+(function () {
+  document.addEventListener("DOMContentLoaded", function () {
+    const article = document.querySelector("article.content");
+    if (!article) return;
+    // Only on session pages (have a breadcrumb + back-to-project link)
+    const backBtn = document.querySelector(".session-actions a.btn");
+    if (!backBtn) return;
+
+    // Extract current page metadata from the llmwiki:metadata comment
+    const html = document.documentElement.outerHTML;
+    const m = html.match(/llmwiki:metadata\n([\s\S]*?)-->/);
+    if (!m) return;
+    const meta = {};
+    m[1].split("\n").forEach(function (line) {
+      const idx = line.indexOf(":");
+      if (idx > 0) {
+        const k = line.slice(0, idx).trim();
+        const v = line.slice(idx + 1).trim();
+        if (k && v) meta[k] = v;
+      }
+    });
+    const currentProject = meta.project || "";
+    const currentSlug = meta.slug || "";
+    if (!currentProject) return;
+
+    const url = window.LLMWIKI_INDEX_URL || "search-index.json";
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (entries) {
+        if (!entries || !entries.length) return;
+        // Score each other session: same project = 2 pts, shared wikilink targets = +1 per token
+        const scored = entries
+          .filter(function (e) {
+            return e.type === "session" && e.url && !e.url.endsWith(currentSlug + ".html");
+          })
+          .map(function (e) {
+            let score = 0;
+            if (e.project === currentProject) score += 2;
+            return { entry: e, score: score };
+          })
+          .filter(function (s) { return s.score > 0; })
+          .sort(function (a, b) { return b.score - a.score; })
+          .slice(0, 5);
+        if (!scored.length) return;
+
+        const section = document.createElement("div");
+        section.className = "related-pages";
+        section.innerHTML =
+          "<h3>Related pages</h3>" +
+          '<ul>' +
+          scored.map(function (s) {
+            const href = "../../" + s.entry.url;
+            const title = s.entry.title;
+            const date = s.entry.date || "";
+            return '<li><a href="' + href + '">' + title + '</a>' +
+              (date ? ' <span class="muted">· ' + date + '</span>' : '') +
+              '</li>';
+          }).join("") +
+          '</ul>';
+        article.appendChild(section);
+      })
+      .catch(function () {});
+  });
+})();
+
+// ─── v0.4: Activity heatmap on home page ──────────────────────────────────
+(function () {
+  document.addEventListener("DOMContentLoaded", function () {
+    const heroSub = document.querySelector(".hero h1");
+    if (!heroSub || heroSub.textContent.trim() !== "LLM Wiki") return;
+    // We're on the home page
+    const url = window.LLMWIKI_INDEX_URL || "search-index.json";
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (entries) {
+        const counts = new Map();
+        entries.forEach(function (e) {
+          if (e.type !== "session" || !e.date) return;
+          counts.set(e.date, (counts.get(e.date) || 0) + 1);
+        });
+        if (counts.size < 2) return;
+        const dates = Array.from(counts.keys()).sort();
+        const maxCount = Math.max(...counts.values());
+
+        const container = document.querySelector(".section .container");
+        if (!container) return;
+        const block = document.createElement("div");
+        block.className = "activity-heatmap";
+        const cells = dates.map(function (d) {
+          const n = counts.get(d);
+          const intensity = n / maxCount;
+          const hex = Math.round(80 + intensity * 175).toString(16).padStart(2, "0");
+          return '<span class="cell" title="' + d + ' · ' + n + ' sessions" ' +
+            'style="background: #7C3AED' + hex + '"></span>';
+        }).join("");
+        block.innerHTML =
+          '<div class="heatmap-label muted">Activity · ' + dates.length +
+          ' days · peak ' + maxCount + ' sessions</div>' +
+          '<div class="heatmap-cells">' + cells + '</div>';
+        const h2 = container.querySelector("h2");
+        if (h2) container.insertBefore(block, h2);
+      })
+      .catch(function () {});
+  });
+})();
+
+// ─── v0.4: Search result highlights ──────────────────────────────────────
+// When showing search palette results, highlight the matched query in the
+// title and body snippet.
+(function () {
+  function highlight(text, query) {
+    if (!query || !text) return escapeLocalHtml(text);
+    const q = query.toLowerCase();
+    const lower = text.toLowerCase();
+    const i = lower.indexOf(q);
+    if (i === -1) return escapeLocalHtml(text);
+    return escapeLocalHtml(text.slice(0, i)) +
+      '<mark>' + escapeLocalHtml(text.slice(i, i + q.length)) + '</mark>' +
+      escapeLocalHtml(text.slice(i + q.length));
+  }
+  function escapeLocalHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  // Expose so the palette renderer can call it if it chooses
+  window.llmwikiHighlight = highlight;
+})();
+
+// ─── v0.4: Deep-link icon next to headings ────────────────────────────────
+(function () {
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".content h2[id], .content h3[id], .content h4[id]").forEach(function (h) {
+      if (h.querySelector(".deep-link")) return;
+      const icon = document.createElement("a");
+      icon.className = "deep-link";
+      icon.href = "#" + h.id;
+      icon.innerHTML = "🔗";
+      icon.title = "Copy link to this section";
+      icon.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        const url = window.location.origin + window.location.pathname + "#" + h.id;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(function () {
+            icon.textContent = "✓";
+            setTimeout(function () { icon.textContent = "🔗"; }, 1200);
+          });
+        }
+      });
+      h.appendChild(icon);
+    });
+  });
+})();
 """
 
 
@@ -1687,6 +1956,45 @@ def build_site(
     except OSError:
         idx_size = 0
     print(f"  wrote search-index.json ({idx_size // 1024} KB)")
+
+    # v0.4: AI-consumable exports (llms.txt, llms-full.txt, graph.jsonld,
+    # sitemap.xml, rss.xml, robots.txt, ai-readme.md)
+    try:
+        from llmwiki.exporters import export_all
+        ai_paths = export_all(out_dir, groups, sources)
+        print(f"  wrote {len(ai_paths)} AI-consumable exports: {', '.join(sorted(ai_paths.keys()))}")
+    except Exception as e:
+        print(f"  warning: AI exports failed: {e}", file=sys.stderr)
+
+    # v0.4: Per-page sibling .txt and .json
+    try:
+        from llmwiki.exporters import write_page_txt, write_page_json
+        n_siblings = 0
+        for path, meta, body in sources:
+            project = str(meta.get("project") or path.parent.name)
+            slug = str(meta.get("slug", path.stem))
+            html_path = out_dir / "sessions" / project / f"{path.stem}.html"
+            if html_path.exists():
+                body_stripped = strip_leading_h1(body)
+                wikilinks_out = [m for m in re.findall(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", body_stripped)]
+                write_page_txt(html_path, body_stripped)
+                # Inject slug/title back into meta if missing
+                meta_copy = dict(meta)
+                meta_copy.setdefault("slug", slug)
+                meta_copy.setdefault("project", project)
+                write_page_json(html_path, meta_copy, body_stripped, wikilinks_out)
+                n_siblings += 2
+        print(f"  wrote {n_siblings} per-page siblings (.txt + .json)")
+    except Exception as e:
+        print(f"  warning: per-page siblings failed: {e}", file=sys.stderr)
+
+    # v0.4: Build manifest with SHA-256 hashes
+    try:
+        from llmwiki.manifest import write_manifest
+        manifest_path = write_manifest(out_dir)
+        print(f"  wrote {manifest_path.relative_to(out_dir.parent) if manifest_path.is_relative_to(out_dir.parent) else manifest_path.name}")
+    except Exception as e:
+        print(f"  warning: manifest failed: {e}", file=sys.stderr)
 
     total_files = sum(1 for _ in out_dir.rglob("*.html"))
     total_bytes = sum(p.stat().st_size for p in out_dir.rglob("*") if p.is_file())
