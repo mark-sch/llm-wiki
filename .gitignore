@@ -150,11 +150,3 @@ eval-report.json
 tests/e2e/screenshots/
 test-results/
 playwright-report/
-
-# Social media screenshots — generated on-demand, not committed
-docs/images/llmwiki-combined-4up.png
-docs/images/llmwiki-linkedin-square.png
-docs/images/home.png
-docs/images/session.png
-docs/images/model.png
-docs/images/compare.png
