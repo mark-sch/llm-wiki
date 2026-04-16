@@ -1401,23 +1401,26 @@ def build_search_index(
       search-chunks/<project>.json — session entries per project
     """
     # ── session entries grouped by project ──
+    from llmwiki.search_facets import enrich_entry
     chunks: dict[str, list[dict[str, Any]]] = {}
     for p, meta, body in sources:
         project = str(meta.get("project") or p.parent.name)
         slug = str(meta.get("slug", p.stem))
         plain = md_to_plain_text(body)[:1200]
-        chunks.setdefault(project, []).append(
-            {
-                "id": f"session:{project}/{p.stem}",
-                "url": f"sessions/{project}/{p.stem}.html",
-                "title": slug,
-                "type": "session",
-                "project": project,
-                "date": str(meta.get("date", "")),
-                "model": str(meta.get("model", "")),
-                "body": plain,
-            }
-        )
+        entry = {
+            "id": f"session:{project}/{p.stem}",
+            "url": f"sessions/{project}/{p.stem}.html",
+            "title": slug,
+            "type": "session",
+            "project": project,
+            "date": str(meta.get("date", "")),
+            "model": str(meta.get("model", "")),
+            "body": plain,
+        }
+        # v1.0 (#161): enrich with facet fields (confidence, lifecycle,
+        # entity_type, tags) so the client can rank + filter.
+        enrich_entry(entry, meta)
+        chunks.setdefault(project, []).append(entry)
 
     # ── write per-project chunks ──
     chunks_dir = out_dir / "search-chunks"
@@ -1461,7 +1464,19 @@ def build_search_index(
          "type": "page", "project": "", "date": "", "model": "", "body": "sortable sessions table"}
     )
 
-    index_obj = {"entries": meta_entries, "_chunks": chunk_manifest}
+    # v1.0 (#161): aggregate facet counts across all session chunks so the
+    # client can render filter checkboxes without scanning the full index.
+    from llmwiki.search_facets import aggregate_facets
+    all_entries: list[dict[str, Any]] = []
+    for chunk_entries in chunks.values():
+        all_entries.extend(chunk_entries)
+    facets = aggregate_facets(all_entries)
+
+    index_obj = {
+        "entries": meta_entries,
+        "_chunks": chunk_manifest,
+        "_facets": facets,
+    }
     out_path = out_dir / "search-index.json"
     out_path.write_text(json.dumps(index_obj, ensure_ascii=False), encoding="utf-8")
 
