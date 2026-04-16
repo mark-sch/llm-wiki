@@ -22,6 +22,13 @@ wiki/index.md
 wiki/overview.md
 wiki/log.md
 wiki/lint-report.md
+wiki/MEMORY.md
+wiki/SOUL.md
+wiki/CRITICAL_FACTS.md
+wiki/hints.md
+wiki/hot.md
+wiki/hot/*
+!wiki/hot/.gitkeep
 !wiki/.gitkeep
 !wiki/README.md
 # v0.5 (#60): seeded folder-context files ship with the repo so the
