@@ -59,6 +59,12 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 - **Remove personal data from tracked nav files** — `wiki/MEMORY.md`, `wiki/SOUL.md`, `wiki/CRITICAL_FACTS.md`, `wiki/hints.md`, `wiki/hot.md` untracked from git (contain user-specific data). Added to `.gitignore`. These are created locally by `llmwiki init` but never committed to the public repo.
 
+### Changed
+
+- **Consistency audit: `type: context` canonical** — normalized 3 `_context.md` files (entities, concepts, sources) from `type: folder-context` to `type: context`. All 7 folder-context stubs now use the same value. Lint rule's `VALID_TYPES` no longer accepts the legacy `folder-context` alias. Inline docstrings + test fixtures updated.
+- **Consistency audit: label hygiene** — deleted duplicate `documentation` label (kept `docs`). Added conventional-commit labels: `fix`, `test`, `ci`, `dependencies`, `perf`, `refactor`, `a11y`, `release`. Simplified `.github/release-drafter.yml` to map canonical labels only.
+- **Consistency audit: test file rename** — `tests/e2e/test_edge_cases.py` renamed to `tests/e2e/test_e2e_edge_cases.py` to avoid collision with the unit-test file `tests/test_edge_cases.py`.
+
 ### Tests
 
 - **Two-way Obsidian editing verification** (#158) — 8 tests covering: user edits visible via `load_pages()`, frontmatter changes preserved, user-added tags affect category generation, user-added `[[wikilinks]]` pass link integrity, `load_pages()` follows symlinks (for `link-obsidian`), edit→reload cycle, `## Custom Section` preservation through lint/category runs.

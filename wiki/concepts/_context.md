@@ -1,5 +1,5 @@
 ---
-type: folder-context
+type: context
 title: Concepts
 ---
 

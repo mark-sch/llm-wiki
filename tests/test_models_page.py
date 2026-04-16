@@ -47,7 +47,7 @@ def test_discover_model_entities_filters_non_model_pages(tmp_path):
 def test_discover_model_entities_skips_context_files(tmp_path):
     _write_entity(
         tmp_path, "_context.md",
-        "---\ntype: folder-context\nentity_kind: ai-model\n---\n\nFolder ctx.\n",
+        "---\ntype: context\nentity_kind: ai-model\n---\n\nFolder ctx.\n",
     )
     assert discover_model_entities(tmp_path) == []
 

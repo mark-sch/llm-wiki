@@ -51,7 +51,7 @@ def load_folder_context(folder: Path) -> Optional[tuple[dict[str, str], str]]:
     Returns `(frontmatter_dict, body_text)` or `None` if the file doesn't
     exist / can't be read. The frontmatter parser is intentionally minimal
     (key/value only, no lists or nested objects) because `_context.md`
-    metadata is expected to be simple — usually just `type: folder-context`.
+    metadata is expected to be simple — usually just `type: context`.
     """
     ctx_path = folder / CONTEXT_FILENAME
     if not ctx_path.is_file():
