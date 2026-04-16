@@ -283,6 +283,46 @@ def cmd_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_link_obsidian(args: argparse.Namespace) -> int:
+    """Create a symlink from an Obsidian vault to the llm-wiki project root."""
+    vault = Path(args.vault).expanduser().resolve()
+    if not vault.is_dir():
+        print(f"error: vault path does not exist: {vault}", file=sys.stderr)
+        return 2
+
+    link_path = vault / args.name
+    target = REPO_ROOT
+
+    if link_path.is_symlink():
+        existing = link_path.resolve()
+        if existing == target and not args.force:
+            print(f"  ✓ symlink already exists: {link_path} → {target}")
+            return 0
+        if args.force:
+            link_path.unlink()
+            print(f"  removed existing symlink: {link_path}")
+        else:
+            print(
+                f"error: {link_path} already exists (→ {existing}). "
+                f"Use --force to overwrite.",
+                file=sys.stderr,
+            )
+            return 1
+    elif link_path.exists():
+        print(
+            f"error: {link_path} exists and is not a symlink. "
+            f"Remove it manually first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    link_path.symlink_to(target)
+    print(f"  ✓ created symlink: {link_path} → {target}")
+    print(f"  Obsidian will now show the llm-wiki project under '{args.name}/'")
+    print(f"  wiki/ pages use [[wikilinks]] which Obsidian resolves natively.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="llmwiki",
@@ -420,6 +460,25 @@ def build_parser() -> argparse.ArgumentParser:
     mf.add_argument("--site-dir", type=Path, default=None)
     mf.add_argument("--fail-on-violations", action="store_true")
     mf.set_defaults(func=cmd_manifest)
+
+    # link-obsidian (v1.0, Obsidian integration)
+    lo = sub.add_parser(
+        "link-obsidian",
+        help="Symlink the llm-wiki project into an Obsidian vault for native viewing",
+    )
+    lo.add_argument(
+        "--vault", type=str, required=True,
+        help="Path to the Obsidian vault root (e.g. ~/Documents/Obsidian Vault)",
+    )
+    lo.add_argument(
+        "--name", type=str, default="LLM Wiki",
+        help="Name for the symlink inside the vault (default: 'LLM Wiki')",
+    )
+    lo.add_argument(
+        "--force", action="store_true",
+        help="Overwrite existing symlink if present",
+    )
+    lo.set_defaults(func=cmd_link_obsidian)
 
     # version
     ver = sub.add_parser("version", help="Print version")
