@@ -79,8 +79,7 @@ class FrontmatterValidity(LintRule):
     severity = "error"
 
     VALID_TYPES = {"source", "entity", "concept", "synthesis",
-                   "comparison", "question", "navigation", "context",
-                   "folder-context"}
+                   "comparison", "question", "navigation", "context"}
     VALID_LIFECYCLES = {s.value for s in LifecycleState}
 
     def run(self, pages, *, llm_callback=None):

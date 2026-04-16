@@ -1,10 +1,12 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
+# Labels follow Conventional Commits. Canonical list:
+#   feat, fix, docs, chore, test, ci, perf, a11y, refactor
+# Plus: bug (synonym for fix), enhancement (larger feat), dependencies.
 categories:
   - title: 'New Features'
     labels:
       - 'feat'
-      - 'feature'
       - 'enhancement'
   - title: 'Bug Fixes'
     labels:
@@ -13,7 +15,6 @@ categories:
   - title: 'Documentation'
     labels:
       - 'docs'
-      - 'documentation'
   - title: 'Maintenance'
     labels:
       - 'chore'
@@ -22,20 +23,21 @@ categories:
   - title: 'Testing'
     labels:
       - 'test'
-      - 'testing'
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
 version-resolver:
   minor:
     labels:
       - 'feat'
-      - 'feature'
+      - 'enhancement'
   patch:
     labels:
       - 'fix'
       - 'bug'
       - 'docs'
       - 'chore'
+      - 'ci'
+      - 'test'
   default: patch
 template: |
   ## What's Changed

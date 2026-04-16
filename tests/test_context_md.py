@@ -40,14 +40,14 @@ def test_load_folder_context_returns_none_for_missing(tmp_path):
 
 def test_load_folder_context_parses_frontmatter(tmp_path):
     (tmp_path / "_context.md").write_text(
-        "---\ntype: folder-context\ntitle: Entities\n---\n\n"
+        "---\ntype: context\ntitle: Entities\n---\n\n"
         "People and companies tracked by the wiki.\n",
         encoding="utf-8",
     )
     result = load_folder_context(tmp_path)
     assert result is not None
     meta, body = result
-    assert meta == {"type": "folder-context", "title": "Entities"}
+    assert meta == {"type": "context", "title": "Entities"}
     assert "People and companies" in body
 
 
