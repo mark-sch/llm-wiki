@@ -30,6 +30,8 @@ wiki/hot.md
 wiki/hot/*
 !wiki/hot/.gitkeep
 wiki/dashboard.md
+wiki/categories/*
+!wiki/categories/_context.md
 !wiki/.gitkeep
 !wiki/README.md
 # v0.5 (#60): seeded folder-context files ship with the repo so the
