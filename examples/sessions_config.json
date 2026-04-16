@@ -72,5 +72,16 @@
     "watch_dir": "raw/web",
     "extensions": [".md"],
     "auto_queue": true
+  },
+
+  "scheduled_sync": {
+    "enabled": false,
+    "_comment": "Auto-sync cadence for `llmwiki schedule` task generator. Values: daily | weekly | hourly. Run `llmwiki schedule` to generate OS-specific files.",
+    "cadence": "daily",
+    "hour": 3,
+    "minute": 0,
+    "weekday": 0,
+    "working_dir": "~/llm-wiki",
+    "llmwiki_bin": "/usr/local/bin/llmwiki"
   }
 }
