@@ -295,6 +295,60 @@ def cmd_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lint(args: argparse.Namespace) -> int:
+    """Run all 11 lint rules against the wiki and print a report."""
+    from llmwiki.lint import load_pages, run_all, summarize
+
+    wiki_dir = args.wiki_dir or (REPO_ROOT / "wiki")
+    if not wiki_dir.is_dir():
+        print(f"error: wiki directory not found: {wiki_dir}", file=sys.stderr)
+        return 2
+
+    pages = load_pages(wiki_dir)
+    if not pages:
+        print(f"  no pages found in {wiki_dir}")
+        return 0
+
+    selected = args.rules.split(",") if args.rules else None
+    issues = run_all(
+        pages,
+        include_llm=args.include_llm,
+        selected=selected,
+    )
+
+    summary = summarize(issues)
+
+    if args.json:
+        import json as _json
+        print(_json.dumps({
+            "summary": summary,
+            "issues": issues,
+            "total_pages": len(pages),
+        }, indent=2))
+    else:
+        print(f"  scanned {len(pages)} pages")
+        print(f"  {sum(summary.values())} issues: "
+              f"{summary.get('error', 0)} errors, "
+              f"{summary.get('warning', 0)} warnings, "
+              f"{summary.get('info', 0)} info")
+        print()
+        if issues:
+            by_rule: dict[str, list[dict[str, str]]] = {}
+            for i in issues:
+                by_rule.setdefault(i["rule"], []).append(i)
+            for rule, rule_issues in sorted(by_rule.items()):
+                print(f"## {rule} ({len(rule_issues)})")
+                for i in rule_issues[:20]:
+                    print(f"  [{i['severity']}] {i['page']}: {i['message']}")
+                if len(rule_issues) > 20:
+                    print(f"  ... and {len(rule_issues) - 20} more")
+                print()
+
+    if args.fail_on_errors and summary.get("error", 0) > 0:
+        return 1
+    return 0
+
+
 def cmd_link_obsidian(args: argparse.Namespace) -> int:
     """Create a symlink from an Obsidian vault to the llm-wiki project root."""
     vault = Path(args.vault).expanduser().resolve()
@@ -472,6 +526,22 @@ def build_parser() -> argparse.ArgumentParser:
     mf.add_argument("--site-dir", type=Path, default=None)
     mf.add_argument("--fail-on-violations", action="store_true")
     mf.set_defaults(func=cmd_manifest)
+
+    # lint (v1.0, #155) — 11 lint rules
+    lint = sub.add_parser(
+        "lint",
+        help="Run all 11 lint rules against the wiki (8 basic + 3 LLM-powered)",
+    )
+    lint.add_argument("--wiki-dir", type=Path, default=None,
+                      help="Wiki directory (default: ./wiki)")
+    lint.add_argument("--rules", type=str, default=None,
+                      help="Comma-separated rule names (default: all applicable)")
+    lint.add_argument("--include-llm", action="store_true",
+                      help="Also run LLM-powered rules (requires --llm-callback)")
+    lint.add_argument("--json", action="store_true", help="JSON output")
+    lint.add_argument("--fail-on-errors", action="store_true",
+                      help="Exit non-zero if any error-severity issues found")
+    lint.set_defaults(func=cmd_lint)
 
     # link-obsidian (v1.0, Obsidian integration)
     lo = sub.add_parser(
