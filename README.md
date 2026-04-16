@@ -9,13 +9,15 @@ Rebuilt on every `master` push from the synthetic sessions in [`examples/demo-se
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-v0.9.0-7C3AED.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-472%20passing-10B981.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-v0.9.4-7C3AED.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-1194%20passing-10B981.svg)](tests/)
+[![CI](https://github.com/Pratiyush/llm-wiki/actions/workflows/ci.yml/badge.svg)](https://github.com/Pratiyush/llm-wiki/actions/workflows/ci.yml)
 [![Works with Claude Code](https://img.shields.io/badge/Claude%20Code-✓-7C3AED.svg)](https://claude.com/claude-code)
 [![Works with Codex CLI](https://img.shields.io/badge/Codex%20CLI-✓-7C3AED.svg)](https://github.com/openai/codex)
 [![Works with Copilot](https://img.shields.io/badge/GitHub%20Copilot-✓-7C3AED.svg)](https://github.com/features/copilot)
 [![Works with Cursor](https://img.shields.io/badge/Cursor-✓-7C3AED.svg)](https://cursor.com)
 [![Works with Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-✓-7C3AED.svg)](https://ai.google.dev/gemini-api)
+[![Works with Obsidian](https://img.shields.io/badge/Obsidian-✓-7C3AED.svg)](https://obsidian.md)
 
 ---
 
@@ -101,10 +103,28 @@ Site-level AI-agent entry points:
 
 Every page also includes an `<!-- llmwiki:metadata -->` HTML comment that AI agents can parse without fetching the separate `.json` sibling.
 
+### Quality & governance (v1.0)
+- **4-factor confidence scoring** — source count, source quality, recency, cross-references; with Ebbinghaus-inspired decay per content-type
+- **5-state lifecycle machine** — draft → reviewed → verified → stale → archived with 90-day auto-stale
+- **11 lint rules** — 8 structural (frontmatter, link integrity, orphans, freshness, duplicates, index sync…) + 3 LLM-powered (contradictions, claim verification, summary accuracy)
+- **Auto Dream** — MEMORY.md consolidation after 24h + 5 sessions: resolve relative dates, prune outdated, 200-line cap
+- **9 navigation files** — CLAUDE.md, AGENTS.md, MEMORY.md, SOUL.md, CRITICAL_FACTS.md, hints.md, hot.md + per-project hot caches
+
+### Obsidian-native experience (v1.0)
+- **`link-obsidian` CLI** — symlinks the whole project into an Obsidian vault; graph view + backlinks + full-text search just work
+- **Dataview dashboard** — 10 ready-to-use queries (recently updated, by confidence, by lifecycle, by project, by entity type, open questions, stale pages)
+- **Templater templates** — 4 templates for source/entity/concept/synthesis pages, seeded with confidence + lifecycle + today's date
+- **Category pages** — tag-based index pages in both Dataview (Obsidian) and static markdown (HTML) modes
+- **Integration guide** — [`docs/obsidian-integration.md`](docs/obsidian-integration.md) covers 6 recommended plugins with per-plugin configs
+
 ### Automation
 - **SessionStart hook** — auto-syncs new sessions in the background on every Claude Code launch
 - **File watcher** — `llmwiki watch` polls agent stores with debounce and runs sync on change
-- **MCP server** — 7 production tools (`wiki_query`, `wiki_search`, `wiki_list_sources`, `wiki_read_page`, `wiki_lint`, `wiki_sync`, `wiki_export`) queryable from any MCP client (Claude Desktop, Cline, Cursor, ChatGPT desktop)
+- **Auto-build on sync** — `/wiki-sync` triggers `/wiki-build` (configurable; default on)
+- **Configurable scheduled sync** — `llmwiki schedule` generates OS-specific task files (launchd/systemd/Task Scheduler)
+- **MCP server** — 12 production tools (query, search, list, read, lint, sync, export, + confidence, lifecycle, dashboard, entity search, category browse) queryable from any MCP client (Claude Desktop, Cline, Cursor, ChatGPT desktop)
+- **Multi-agent skill mirror** — `llmwiki install-skills` mirrors `.claude/skills/` to `.codex/skills/` and `.agents/skills/`
+- **Pending ingest queue** — SessionStart hook converts + queues; `/wiki-sync` processes queue
 - **No servers, no database, no npm** — Python stdlib + `markdown`. Syntax highlighting loads from a highlight.js CDN at view time.
 
 ## How it works
@@ -283,33 +303,38 @@ stdout/stderr, screenshot on failure.
 
 ## Scheduled sync
 
-Templates for running `llmwiki sync` automatically on a daily schedule:
+Run `llmwiki schedule` to generate the right scheduled task file for your OS from your config (cadence, time, paths). Or copy a static template:
 
-| OS | Template | Install guide |
-|---|---|---|
-| macOS | [`launchd.plist`](docs/scheduled-sync/launchd.plist) | [docs/scheduled-sync.md](docs/scheduled-sync.md#macos-launchd) |
-| Linux | [`systemd.timer`](docs/scheduled-sync/llmwiki-sync.timer) + [`.service`](docs/scheduled-sync/llmwiki-sync.service) | [docs/scheduled-sync.md](docs/scheduled-sync.md#linux-systemd) |
-| Windows | [`task.xml`](docs/scheduled-sync/llmwiki-sync-task.xml) | [docs/scheduled-sync.md](docs/scheduled-sync.md#windows-task-scheduler) |
+| OS | Auto-generate | Static template | Install guide |
+|---|---|---|---|
+| macOS | `llmwiki schedule --platform macos` | [`launchd.plist`](docs/scheduled-sync/launchd.plist) | [docs/scheduled-sync.md](docs/scheduled-sync.md#macos-launchd) |
+| Linux | `llmwiki schedule --platform linux` | [`systemd.timer`](docs/scheduled-sync/llmwiki-sync.timer) + [`.service`](docs/scheduled-sync/llmwiki-sync.service) | [docs/scheduled-sync.md](docs/scheduled-sync.md#linux-systemd) |
+| Windows | `llmwiki schedule --platform windows` | [`task.xml`](docs/scheduled-sync/llmwiki-sync-task.xml) | [docs/scheduled-sync.md](docs/scheduled-sync.md#windows-task-scheduler) |
 
-See [`docs/scheduled-sync.md`](docs/scheduled-sync.md) for full instructions.
+Cadence (`daily` / `weekly` / `hourly`), hour/minute, and paths are all configurable in `examples/sessions_config.json`. See [`docs/scheduled-sync.md`](docs/scheduled-sync.md) for full instructions.
 
 ## CLI reference
 
 ```bash
-llmwiki init                    # scaffold raw/ wiki/ site/
-llmwiki sync                    # convert .jsonl → markdown
+llmwiki init                    # scaffold raw/ wiki/ site/ + seed nav files
+llmwiki sync                    # convert .jsonl → markdown (auto-build + auto-lint if configured)
 llmwiki build                   # compile static HTML + AI exports
 llmwiki serve                   # local HTTP server on 127.0.0.1:8765
-llmwiki adapters                # list available adapters
+llmwiki adapters                # list available adapters + configured state (v1.0)
 llmwiki graph                   # build knowledge graph (v0.2)
 llmwiki watch                   # file watcher with debounce (v0.2)
 llmwiki export-obsidian         # write wiki to Obsidian vault (v0.2)
 llmwiki export-qmd              # export wiki as a qmd collection (v0.6)
+llmwiki export-marp             # export Marp slide deck from wiki (v0.7)
 llmwiki eval                    # 7-check structural quality score /100 (v0.3)
+llmwiki lint                    # 11-rule wiki lint (8 basic + 3 LLM-powered, v1.0)
 llmwiki check-links             # verify internal links in site/ (v0.4)
 llmwiki export <format>         # AI-consumable exports (v0.4)
 llmwiki synthesize              # auto-ingest synthesis pipeline (v0.5)
 llmwiki manifest                # build site manifest + perf budget (v0.4)
+llmwiki link-obsidian           # symlink project into Obsidian vault (v1.0)
+llmwiki install-skills          # mirror .claude/skills to .codex/ and .agents/ (v1.0)
+llmwiki schedule                # generate OS-specific scheduled sync task (v1.0)
 llmwiki version
 ```
 
@@ -340,7 +365,7 @@ llmwiki ships its own MCP server (stdio transport, no SDK dependency) so any MCP
 python3 -m llmwiki.mcp   # runs on stdin/stdout
 ```
 
-Seven production tools:
+Twelve production tools (7 core + 5 added in v1.0 `#159`):
 
 | Tool | What |
 |---|---|
@@ -351,6 +376,11 @@ Seven production tools:
 | `wiki_lint()` | Orphans + broken-wikilinks report |
 | `wiki_sync(dry_run)` | Trigger the converter |
 | `wiki_export(format)` | Return any AI-consumable export (llms.txt, jsonld, sitemap, rss, manifest) |
+| `wiki_confidence(min, max)` | Pages by confidence range (v1.0) |
+| `wiki_lifecycle(state)` | Pages by draft/reviewed/verified/stale/archived (v1.0) |
+| `wiki_dashboard()` | Health summary: counts by type, lifecycle, confidence (v1.0) |
+| `wiki_entity_search(name, entity_type)` | Search entities by name substring or type (v1.0) |
+| `wiki_category_browse(tag)` | Browse tags with counts, drill into specific tag (v1.0) |
 
 Register in your MCP client's config — e.g. for Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -433,9 +463,11 @@ See [docs/architecture.md](docs/architecture.md) for the full breakdown and how 
 ## Docs
 
 - [Getting started](docs/getting-started.md) — 5-minute quickstart
+- [Obsidian integration](docs/obsidian-integration.md) — 5-minute setup, 6 recommended plugins, config recipes (v1.0)
 - [Architecture](docs/architecture.md) — Karpathy 3-layer + 8-layer build breakdown
 - [Configuration](docs/configuration.md) — every tuning knob
 - [Privacy](docs/privacy.md) — redaction rules + `.llmwikiignore` + localhost binding
+- [Scheduled sync](docs/scheduled-sync.md) — daily/weekly/hourly task setup per OS
 - [Windows setup](docs/windows-setup.md) — Windows-specific gotchas
 - [Framework](docs/framework.md) — Open Source Framework v4.1 adapted for agent-native dev tools
 - [Research](docs/research.md) — Phase 1.25 analysis of 15 prior LLM Wiki implementations
@@ -467,6 +499,10 @@ Per-adapter docs:
 | [v0.7.0](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.7.0) | Structured model-profile schema, auto-generated vs-comparison pages, append-only changelog timeline | `v0.7.0` |
 | [v0.8.0](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.8.0) | 365-day activity heatmap, tool-calling bar chart, token usage card, session metrics frontmatter | `v0.8.0` |
 | [v0.9.0](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.9.0) | Project topics, agent labels (Claude/Codex/Copilot/Cursor/Gemini badges), Copilot adapters, image pipeline, highlight.js, public demo deployment | `v0.9.0` |
+| [v0.9.1](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.9.1) | Sprint 1 & 2 foundation — link-obsidian CLI, 4-factor confidence scoring, 5-state lifecycle machine, llmbook-reference skill, 7 entity types, flat raw/ naming, pending ingest queue, `_context.md` stubs, meeting + Jira adapters, configurable Web Clipper intake, rich log format | `v0.9.1` |
+| [v0.9.2](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.9.2) | Sprint 3 quality — 11 lint rules (8 basic + 3 LLM-powered), Auto Dream MEMORY.md consolidation, Dataview dashboard template, category pages (Dataview + static), auto-build on sync + configurable lint schedule | `v0.9.2` |
+| [v0.9.3](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.9.3) | Sprint 3 polish — Obsidian Templater templates, integration guide, two-way editing tests, MCP server 7→12 tools, adapter config validation, pipeline fix (sigstore, PyPI gate) | `v0.9.3` |
+| [v0.9.4](https://github.com/Pratiyush/llm-wiki/releases/tag/v0.9.4) | Session C1 (Sprint 4) — multi-agent skill installer, enhanced search with facets, configurable scheduled sync (launchd/systemd/Task Scheduler), CI wiki-checks workflow | `v0.9.4` |
 
 ## Roadmap
 
@@ -477,12 +513,15 @@ Shipped milestones:
 - **v0.7.0** — Structured model-profile schema, vs-comparison pages, append-only changelog timeline ([milestone](https://github.com/Pratiyush/llm-wiki/milestone/7))
 - **v0.8.0** — 365-day activity heatmap, tool-calling bar chart, token usage card, session metrics frontmatter ([milestone](https://github.com/Pratiyush/llm-wiki/milestone/8))
 - **v0.9.0** — Project topics, agent labels, Copilot adapters, image pipeline, highlight.js, public demo deployment
+- **v0.9.x** — Sprint 1-4 foundation for v1.0.0 Obsidian integration: confidence scoring, lifecycle state machine, 9 navigation files, 11 lint rules, Auto Dream, Dataview dashboard, multi-agent skills, 12-tool MCP server, meeting + Jira adapters
 
-Active milestone:
+Active milestones:
 
 | Milestone | Focus | Tracking |
 |---|---|---|
-| **v1.0.0** | Knowledge graph explorer, light mode polish, interactive graph visualization | [Milestone](https://github.com/Pratiyush/llm-wiki/milestone/9) |
+| **v1.0.0** | Final docs polish + PyPI trusted publisher + release | [Milestone](https://github.com/Pratiyush/llm-wiki/milestone/9) |
+| **v1.1.0** | Ollama backend, prompt caching, interactive graph viewer, Homebrew tap | [Milestone](https://github.com/Pratiyush/llm-wiki/milestone/10) |
+| **v1.2.0** | ChatGPT + OpenCode adapters, vault-overlay mode, tree-aware search, cache tiers | [Milestone](https://github.com/Pratiyush/llm-wiki/milestone/11) |
 
 ### Deployment targets
 

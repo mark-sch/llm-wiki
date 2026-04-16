@@ -61,6 +61,8 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ### Changed
 
+- **README refresh** (#122) — brought README current with v0.9.4 state: test-count badge 472 → 1194, added CI + Obsidian badges, added v0.9.1–v0.9.4 to releases table, added 6 new v1.0 CLI commands (`lint`, `link-obsidian`, `install-skills`, `schedule`, `export-marp`), MCP server expanded from 7 → 12 tools with new rows (`wiki_confidence`, `wiki_lifecycle`, `wiki_dashboard`, `wiki_entity_search`, `wiki_category_browse`), roadmap now shows v1.0.0 + v1.1.0 + v1.2.0 milestones, new "Quality & governance" and "Obsidian-native experience" sections highlight Sprint 3 features, Scheduled sync section mentions `llmwiki schedule` auto-generator, docs list adds `docs/obsidian-integration.md` + `docs/scheduled-sync.md`.
+
 - **Consistency audit: `type: context` canonical** — normalized 3 `_context.md` files (entities, concepts, sources) from `type: folder-context` to `type: context`. All 7 folder-context stubs now use the same value. Lint rule's `VALID_TYPES` no longer accepts the legacy `folder-context` alias. Inline docstrings + test fixtures updated.
 - **Consistency audit: label hygiene** — deleted duplicate `documentation` label (kept `docs`). Added conventional-commit labels: `fix`, `test`, `ci`, `dependencies`, `perf`, `refactor`, `a11y`, `release`. Simplified `.github/release-drafter.yml` to map canonical labels only.
 - **Consistency audit: test file rename** — `tests/e2e/test_edge_cases.py` renamed to `tests/e2e/test_e2e_edge_cases.py` to avoid collision with the unit-test file `tests/test_edge_cases.py`.
