@@ -58,6 +58,8 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ### Fixed
 
+- **Pages deploy no longer fires on tag pushes** — only on push to master. Tag pushes would try to deploy the same content a second time and fail because the GitHub Pages env only accepts master-branch deploys.
+- **PyPI publish is gated on `PYPI_PUBLISHING` repo variable** — until PyPI Trusted Publisher is configured (#101), tag pushes won't fail. The build + sign + GitHub Release still run; only PyPI upload is deferred. Enable via `gh variable set PYPI_PUBLISHING --body "true"` after setup.
 - **Release-drafter runs only on push to master** — removed `pull_request` trigger that caused `target_commitish: refs/pull/N/merge` validation errors with release-drafter@v7. Draft releases only need to update when commits land on master.
 - **Synthesis pipeline writes to real log during tests** (#131) — `_append_log()` in `llmwiki/synth/pipeline.py` now accepts an optional `log_path` parameter (defaults to `WIKI_LOG`), and `synthesize_new_sessions()` forwards it. All tests in `test_synth_pipeline.py` pass isolated `tmp_path` log files. Cleaned 42 duplicate `synthesize | test-proj/test-synth` entries from `wiki/log.md` caused by unguarded test writes.
 

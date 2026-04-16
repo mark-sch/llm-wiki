@@ -56,6 +56,11 @@ jobs:
     environment: release
     permissions:
       id-token: write
+    # Skip PyPI publish if the PYPI_PUBLISHING variable is not set to "true".
+    # One-time setup required on PyPI (trusted publisher) — see #101.
+    # Until configured, release tags still build + sign + create GitHub Release;
+    # only PyPI upload is deferred. Enable via: gh variable set PYPI_PUBLISHING --body "true"
+    if: vars.PYPI_PUBLISHING == 'true'
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -96,7 +101,10 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: [publish, sign]
+    needs: [build, sign]
+    # Run even if publish was skipped or failed — GitHub Release shouldn't
+    # depend on PyPI upload succeeding.
+    if: always() && needs.build.result == 'success' && needs.sign.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

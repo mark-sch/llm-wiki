@@ -1,13 +1,14 @@
 name: Deploy demo site to GitHub Pages
 
 # Builds a public demo from dummy example sessions (no personal data) and
-# publishes it to GitHub Pages. Triggered on tag pushes, pushes to main, and
-# manual runs. Highlight.js loads client-side from CDN so no extra deps.
+# publishes it to GitHub Pages. Triggered on pushes to master/main and manual
+# runs. Not on tag pushes (GitHub Pages env only accepts deploys from master,
+# and the master push already covers the same content). Highlight.js loads
+# client-side from CDN so no extra deps.
 
 on:
   push:
     branches: ["master", "main"]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
