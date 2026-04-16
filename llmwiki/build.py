@@ -1494,11 +1494,12 @@ CSS = """/* llmwiki — god-level docs style */
   --bg: #ffffff;
   --bg-alt: #f8fafc;
   --bg-card: #ffffff;
-  --bg-code: #f1f5f9;
+  --bg-code: #edf0f5;                      /* v1.0 #119: slightly darker for better contrast */
   --text: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #6b7280;  /* WCAG AA: 4.84:1 on white, 4.63:1 on --bg-alt */
-  --border: #e2e8f0;
+  --text-muted: #6b7280;                   /* WCAG AA: 4.84:1 on white, 4.63:1 on --bg-alt */
+  --border: #d1d5db;                       /* v1.0 #119: stronger card borders (was #e2e8f0) */
+  --border-subtle: #e2e8f0;                /* for less prominent separators */
   --accent: #7C3AED;
   --accent-light: #a78bfa;
   --accent-bg: #f5f3ff;
@@ -1506,6 +1507,8 @@ CSS = """/* llmwiki — god-level docs style */
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);  /* v1.0 #119: card shadow */
+  --shadow-card-hover: 0 4px 12px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.06);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -1517,8 +1520,11 @@ CSS = """/* llmwiki — god-level docs style */
     --text-secondary: #94a3b8;
     --text-muted: #8b9bb5;  /* WCAG AA: 6.97:1 on dark bg */
     --border: #2d2b4a;
+    --border-subtle: #1f1d3a;
     --accent-bg: #1e1a3a;
     --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.45);
   }
 }
 :root[data-theme="dark"] {
@@ -1528,10 +1534,13 @@ CSS = """/* llmwiki — god-level docs style */
   --bg-code: #1a1836;
   --text: #e2e8f0;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-muted: #8b9bb5;
   --border: #2d2b4a;
+  --border-subtle: #1f1d3a;
   --accent-bg: #1e1a3a;
   --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1552,7 +1561,8 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
 .progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: var(--accent); z-index: 200; transition: width 0.1s; }
 
 /* Nav */
-.nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+/* v1.0 #119: add a subtle shadow + stronger blur so the nav stays grounded on light backgrounds */
+.nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .nav-inner { max-width: 1080px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; color: var(--text); text-decoration: none; flex-shrink: 0; }
 .nav-brand:hover { text-decoration: none; }
@@ -1666,8 +1676,8 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
 
 /* Cards */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 16px 0; }
-.card { display: block; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); transition: all 0.15s; }
-.card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); box-shadow: var(--shadow); }
+.card { display: block; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); transition: all 0.15s; box-shadow: var(--shadow-card); }
+.card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); box-shadow: var(--shadow-card-hover); }
 .card-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; color: var(--text); }
 .card-meta { font-size: 0.82rem; color: var(--text-secondary); }
 .card-stats { font-size: 0.78rem; margin-top: 6px; }
@@ -1789,7 +1799,7 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
    block so the colors swap with the page theme. The pre-v0.8 JS-based
    tiny-strip heatmap is gone. */
 :root {
-  --heatmap-0: #ebedf0;
+  --heatmap-0: #dde1e6;        /* v1.0 #119: darker level-0 for visibility on white */
   --heatmap-1: #9be9a8;
   --heatmap-2: #40c463;
   --heatmap-3: #30a14e;
@@ -1814,12 +1824,13 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
    colors so the page theme can override them; dark-mode variants
    use saturated fills that read against the dark card background. */
 :root {
-  --tool-cat-io: #3b82f6;
-  --tool-cat-search: #a855f7;
-  --tool-cat-exec: #f97316;
-  --tool-cat-network: #10b981;
-  --tool-cat-plan: #64748b;
-  --tool-cat-other: #9ca3af;
+  /* v1.0 #119: slightly less saturated in light mode — bars read cleaner on white card background */
+  --tool-cat-io: #2563eb;
+  --tool-cat-search: #9333ea;
+  --tool-cat-exec: #ea580c;
+  --tool-cat-network: #059669;
+  --tool-cat-plan: #475569;
+  --tool-cat-other: #6b7280;
 }
 :root[data-theme="dark"] {
   --tool-cat-io: #60a5fa;
@@ -1833,7 +1844,8 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
 .tool-chart-card { margin: 16px 0 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
 .tool-chart-label { font-size: 0.78rem; margin-bottom: 8px; }
 .tool-chart-svg { display: block; max-width: 100%; }
-.tool-chart-svg rect { transition: opacity 0.1s; }
+.tool-chart-svg rect { transition: opacity 0.1s; stroke: rgba(15, 23, 42, 0.08); stroke-width: 1; }  /* v1.0 #119: thin stroke for bar definition */
+:root[data-theme="dark"] .tool-chart-svg rect { stroke: rgba(255, 255, 255, 0.05); }
 .tool-chart-svg rect:hover { opacity: 0.85; }
 
 /* v0.8 (#66): Token usage card — stacked bars for four token categories
