@@ -63,13 +63,23 @@ def _save_state(state: dict[str, float]) -> None:
     )
 
 
-def _append_log(title: str) -> None:
-    """Append a synthesis entry to wiki/log.md."""
-    if not WIKI_LOG.parent.exists():
+def _append_log(title: str, *, log_path: Optional[Path] = None) -> None:
+    """Append a synthesis entry to wiki/log.md.
+
+    Parameters
+    ----------
+    title : str
+        Human-readable title for the log entry (e.g. "project/slug").
+    log_path : Path, optional
+        Override for the log file path — used by tests to avoid writing
+        to the real wiki/log.md.  Defaults to ``WIKI_LOG``.
+    """
+    target = log_path or WIKI_LOG
+    if not target.parent.exists():
         return
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     entry = f"\n## [{date_str}] synthesize | {title}\n"
-    with open(WIKI_LOG, "a", encoding="utf-8") as f:
+    with open(target, "a", encoding="utf-8") as f:
         f.write(entry)
 
 
@@ -127,6 +137,7 @@ def synthesize_new_sessions(
     wiki_sources_dir: Optional[Path] = None,
     dry_run: bool = False,
     force: bool = False,
+    log_path: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Main entry point. Returns a summary dict:
 
@@ -215,7 +226,7 @@ def synthesize_new_sessions(
             summary["synthesized"] += 1
 
             # Append to log
-            _append_log(f"{project}/{slug}")
+            _append_log(f"{project}/{slug}", log_path=log_path)
 
             print(f"  synthesized: {project}/{slug}")
 

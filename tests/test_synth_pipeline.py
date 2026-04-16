@@ -146,12 +146,14 @@ def test_synthesize_fresh_run_produces_source_pages(tmp_path: Path):
     wiki_sources = tmp_path / "wiki" / "sources"
     wiki_sources.mkdir(parents=True)
     # Create log.md so _append_log doesn't fail
-    (tmp_path / "wiki" / "log.md").write_text("# Log\n", encoding="utf-8")
+    log_file = tmp_path / "wiki" / "log.md"
+    log_file.write_text("# Log\n", encoding="utf-8")
 
     summary = synthesize_new_sessions(
         backend=DummySynthesizer(),
         raw_dir=raw,
         wiki_sources_dir=wiki_sources,
+        log_path=log_file,
     )
     assert summary["total_scanned"] == 1
     assert summary["new_files"] == 1
@@ -169,17 +171,20 @@ def test_synthesize_idempotent_rerun_is_noop(tmp_path: Path):
     raw = _seed_raw(tmp_path)
     wiki_sources = tmp_path / "wiki" / "sources"
     wiki_sources.mkdir(parents=True)
-    (tmp_path / "wiki" / "log.md").write_text("# Log\n", encoding="utf-8")
+    log_file = tmp_path / "wiki" / "log.md"
+    log_file.write_text("# Log\n", encoding="utf-8")
 
     # First run
     s1 = synthesize_new_sessions(
         backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
+        log_path=log_file,
     )
     assert s1["synthesized"] == 1
 
     # Second run — should be a no-op (mtime hasn't changed)
     s2 = synthesize_new_sessions(
         backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
+        log_path=log_file,
     )
     assert s2["new_files"] == 0
     assert s2["synthesized"] == 0
@@ -189,16 +194,18 @@ def test_synthesize_force_resynthesizes(tmp_path: Path):
     raw = _seed_raw(tmp_path)
     wiki_sources = tmp_path / "wiki" / "sources"
     wiki_sources.mkdir(parents=True)
-    (tmp_path / "wiki" / "log.md").write_text("# Log\n", encoding="utf-8")
+    log_file = tmp_path / "wiki" / "log.md"
+    log_file.write_text("# Log\n", encoding="utf-8")
 
     # First run
     synthesize_new_sessions(
         backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
+        log_path=log_file,
     )
     # Force re-run
     s2 = synthesize_new_sessions(
         backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
-        force=True,
+        force=True, log_path=log_file,
     )
     assert s2["new_files"] == 1
     assert s2["synthesized"] == 1
@@ -248,10 +255,12 @@ def test_synthesize_backend_error_is_graceful(tmp_path: Path):
     raw = _seed_raw(tmp_path)
     wiki_sources = tmp_path / "wiki" / "sources"
     wiki_sources.mkdir(parents=True)
-    (tmp_path / "wiki" / "log.md").write_text("# Log\n", encoding="utf-8")
+    log_file = tmp_path / "wiki" / "log.md"
+    log_file.write_text("# Log\n", encoding="utf-8")
 
     summary = synthesize_new_sessions(
         backend=CrashingBackend(), raw_dir=raw, wiki_sources_dir=wiki_sources,
+        log_path=log_file,
     )
     assert summary["synthesized"] == 0
     assert summary["skipped"] == 1
