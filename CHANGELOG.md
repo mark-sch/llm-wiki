@@ -63,6 +63,8 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ### Changed
 
+- **Light-mode polish** (#119) — darker `--border` (#d1d5db from #e2e8f0), new `--shadow-card` + `--shadow-card-hover` vars so `.card` elements have real depth on white backgrounds, darker `--bg-code` (#edf0f5), heatmap level-0 darker (#dde1e6 so empty cells are visible on --bg-alt), tool-chart bars less saturated in light mode with a thin 1px stroke for definition, nav gets a subtle box-shadow + stronger 16px backdrop-filter blur so it stays grounded. Dark mode gets matching `--shadow-card`, `--border-subtle` vars so the same CSS rules render correctly.
+
 - **README refresh** (#122) — brought README current with v0.9.4 state: test-count badge 472 → 1194, added CI + Obsidian badges, added v0.9.1–v0.9.4 to releases table, added 6 new v1.0 CLI commands (`lint`, `link-obsidian`, `install-skills`, `schedule`, `export-marp`), MCP server expanded from 7 → 12 tools with new rows (`wiki_confidence`, `wiki_lifecycle`, `wiki_dashboard`, `wiki_entity_search`, `wiki_category_browse`), roadmap now shows v1.0.0 + v1.1.0 + v1.2.0 milestones, new "Quality & governance" and "Obsidian-native experience" sections highlight Sprint 3 features, Scheduled sync section mentions `llmwiki schedule` auto-generator, docs list adds `docs/obsidian-integration.md` + `docs/scheduled-sync.md`.
 
 - **Consistency audit: `type: context` canonical** — normalized 3 `_context.md` files (entities, concepts, sources) from `type: folder-context` to `type: context`. All 7 folder-context stubs now use the same value. Lint rule's `VALID_TYPES` no longer accepts the legacy `folder-context` alias. Inline docstrings + test fixtures updated.
