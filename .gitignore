@@ -69,6 +69,12 @@ dist-site/
 .llmwiki-queue.json
 .llmwiki-dream-state.json
 
+# v1.0 (#160): multi-agent skill mirrors are derived from .claude/skills/
+# by `llmwiki install-skills`. The canonical source ships with the repo;
+# the mirrors are regenerated locally and don't need to be committed.
+.codex/skills/
+.agents/skills/
+
 # Local config (user-specific).
 config.json
 config.local.json

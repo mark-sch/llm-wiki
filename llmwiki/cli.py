@@ -438,6 +438,23 @@ def cmd_lint(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install_skills(args: argparse.Namespace) -> int:
+    """Install llmwiki skills into multi-agent directories (v1.0 · #160)."""
+    from llmwiki.skill_installer import install_all, list_installed
+
+    count = install_all()
+    print(f"  installed {count} skill/target combinations")
+    print()
+    print("Skills installed per target:")
+    for target, skills in list_installed().items():
+        p = Path(target)
+        rel = p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p
+        print(f"  {rel}/  ({len(skills)} skills)")
+        for s in skills:
+            print(f"    - {s}")
+    return 0
+
+
 def cmd_link_obsidian(args: argparse.Namespace) -> int:
     """Create a symlink from an Obsidian vault to the llm-wiki project root."""
     vault = Path(args.vault).expanduser().resolve()
@@ -639,6 +656,13 @@ def build_parser() -> argparse.ArgumentParser:
     lint.add_argument("--fail-on-errors", action="store_true",
                       help="Exit non-zero if any error-severity issues found")
     lint.set_defaults(func=cmd_lint)
+
+    # install-skills (v1.0, #160) — multi-agent skill installer
+    isk = sub.add_parser(
+        "install-skills",
+        help="Install llmwiki skills into .codex/skills/ and .agents/skills/ (multi-agent support)",
+    )
+    isk.set_defaults(func=cmd_install_skills)
 
     # link-obsidian (v1.0, Obsidian integration)
     lo = sub.add_parser(
