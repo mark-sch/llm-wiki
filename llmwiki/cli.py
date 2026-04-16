@@ -173,15 +173,48 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 def cmd_adapters(args: argparse.Namespace) -> int:
-    """List available adapters."""
+    """List available adapters and their config state."""
+    import json as _json
+
     discover_adapters()
     if not REGISTRY:
         print("No adapters registered.")
         return 0
+
+    # Load user config to show enable/disable state
+    config_path = REPO_ROOT / "examples" / "sessions_config.json"
+    config: dict = {}
+    if config_path.is_file():
+        try:
+            config = _json.loads(config_path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            pass
+
     print("Registered adapters:")
+    print(f"  {'name':<16}  {'default':<8}  {'configured':<12}  description")
+    print(f"  {'-' * 16}  {'-' * 8}  {'-' * 12}  {'-' * 40}")
     for name, adapter_cls in sorted(REGISTRY.items()):
-        present = "yes" if adapter_cls.is_available() else "no"
-        print(f"  {name:<16}  available: {present}  ({adapter_cls.description()})")
+        default_avail = "yes" if adapter_cls.is_available() else "no"
+        # Check if user has enabled this adapter in config
+        adapter_cfg = config.get(name, {})
+        if isinstance(adapter_cfg, dict):
+            enabled_in_cfg = adapter_cfg.get("enabled", None)
+            if enabled_in_cfg is True:
+                configured = "enabled"
+            elif enabled_in_cfg is False:
+                configured = "disabled"
+            else:
+                configured = "-"
+        else:
+            configured = "-"
+        desc = adapter_cls.description()
+        if len(desc) > 40:
+            desc = desc[:37] + "..."
+        print(f"  {name:<16}  {default_avail:<8}  {configured:<12}  {desc}")
+
+    print()
+    print("Adapters marked 'disabled' or '-' under configured require explicit")
+    print("opt-in via sessions_config.json. See examples/sessions_config.json.")
     return 0
 
 
