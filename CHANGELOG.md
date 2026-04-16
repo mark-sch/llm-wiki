@@ -14,6 +14,10 @@ Versions below 1.0 are pre-production — API and file formats may change.
 - **Confidence scoring module** (#135) — new `llmwiki/confidence.py` implementing the 4-factor weighted-average formula from the LLM Book design spec: `source_count(0.3) + source_quality(0.3) + recency(0.2) + cross_refs(0.2)`. Includes Ebbinghaus-inspired content-type decay with configurable half-lives (architecture 6mo, tool versions 30d, people 3mo, bugs 14d, APIs 2mo). Each factor maps to [0.0, 1.0]; composite is rounded to 2 decimal places and stored in YAML frontmatter as `confidence: 0.85`.
 - **Lifecycle state machine** (#136) — new `llmwiki/lifecycle.py` with 5 states (draft → reviewed → verified → stale → archived), validated transitions, auto-stale detection after 90 days without update, and confidence-based stale detection (confidence < 0.5). Manual-only transitions for `verified` (human confirms) and `archived` (human decision). Includes `parse_lifecycle()` for YAML frontmatter parsing.
 
+### Changed
+
+- **Rich structured log format with auto-archival** (#133) — `_append_log()` now accepts `operation` and `details` parameters to produce log entries with processed count, created/updated pages, and entities extracted. Auto-archives `wiki/log.md` to `wiki/log-archive-YYYY.md` when the log exceeds 50 KB.
+
 ### Fixed
 
 - **Synthesis pipeline writes to real log during tests** (#131) — `_append_log()` in `llmwiki/synth/pipeline.py` now accepts an optional `log_path` parameter (defaults to `WIKI_LOG`), and `synthesize_new_sessions()` forwards it. All tests in `test_synth_pipeline.py` pass isolated `tmp_path` log files. Cleaned 42 duplicate `synthesize | test-proj/test-synth` entries from `wiki/log.md` caused by unguarded test writes.

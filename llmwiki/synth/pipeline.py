@@ -63,8 +63,14 @@ def _save_state(state: dict[str, float]) -> None:
     )
 
 
-def _append_log(title: str, *, log_path: Optional[Path] = None) -> None:
-    """Append a synthesis entry to wiki/log.md.
+def _append_log(
+    title: str,
+    *,
+    log_path: Optional[Path] = None,
+    operation: str = "synthesize",
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Append a rich structured entry to wiki/log.md.
 
     Parameters
     ----------
@@ -73,14 +79,62 @@ def _append_log(title: str, *, log_path: Optional[Path] = None) -> None:
     log_path : Path, optional
         Override for the log file path — used by tests to avoid writing
         to the real wiki/log.md.  Defaults to ``WIKI_LOG``.
+    operation : str
+        Operation type: synthesize, ingest, query, lint, build, sync.
+    details : dict, optional
+        Rich details — created pages, updated pages, entities extracted, etc.
     """
     target = log_path or WIKI_LOG
     if not target.parent.exists():
         return
+
+    # Auto-archive when log exceeds 50 KB
+    _auto_archive_log(target)
+
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    entry = f"\n## [{date_str}] synthesize | {title}\n"
+    lines = [f"\n## [{date_str}] {operation} | {title}\n"]
+    if details:
+        if details.get("processed"):
+            lines.append(f"- Processed: {details['processed']}\n")
+        if details.get("created"):
+            lines.append(f"- Created: {', '.join(details['created'])}\n")
+        if details.get("updated"):
+            lines.append(f"- Updated: {', '.join(details['updated'])}\n")
+        if details.get("entities"):
+            lines.append(f"- Entities extracted: {', '.join(details['entities'])}\n")
+        if details.get("errors"):
+            lines.append(f"- Errors: {len(details['errors'])}\n")
     with open(target, "a", encoding="utf-8") as f:
-        f.write(entry)
+        f.writelines(lines)
+
+
+LOG_ARCHIVE_THRESHOLD = 50 * 1024  # 50 KB
+
+
+def _auto_archive_log(log_path: Path) -> Optional[Path]:
+    """Archive log.md when it exceeds 50 KB. Returns archive path or None."""
+    if not log_path.is_file():
+        return None
+    if log_path.stat().st_size < LOG_ARCHIVE_THRESHOLD:
+        return None
+
+    year = datetime.now(timezone.utc).strftime("%Y")
+    archive = log_path.parent / f"log-archive-{year}.md"
+
+    content = log_path.read_text(encoding="utf-8")
+    # Keep the header (first 5 lines), archive the rest
+    lines = content.split("\n")
+    header = "\n".join(lines[:5])
+    body = "\n".join(lines[5:])
+
+    # Append to archive
+    with open(archive, "a", encoding="utf-8") as f:
+        f.write(f"\n# Archived from log.md — {year}\n\n")
+        f.write(body)
+
+    # Reset log to header only
+    log_path.write_text(header + "\n\n---\n", encoding="utf-8")
+    return archive
 
 
 def _discover_raw_sessions(
