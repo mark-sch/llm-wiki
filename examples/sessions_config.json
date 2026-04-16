@@ -37,5 +37,40 @@
   "schedule": {
     "build": "on-sync",
     "lint": "manual"
+  },
+
+  "_adapters_comment": "Opt-in adapters (meeting, jira, pdf). All disabled by default — enable explicitly.",
+
+  "pdf": {
+    "enabled": false,
+    "_comment": "Extract text from PDF files into raw/ markdown.",
+    "source_dirs": ["~/Documents/PDFs"],
+    "min_pages": 1,
+    "max_pages": 500
+  },
+
+  "meeting": {
+    "enabled": false,
+    "_comment": "Meeting transcript adapter (VTT/SRT). See llmwiki/adapters/meeting.py.",
+    "source_dirs": ["~/Meetings"],
+    "extensions": [".vtt", ".srt"]
+  },
+
+  "jira": {
+    "enabled": false,
+    "_comment": "Jira REST API adapter. Requires 'jira' package: pip install jira",
+    "server": "https://your-company.atlassian.net",
+    "email": "you@example.com",
+    "api_token": "",
+    "jql": "assignee = currentUser() AND resolution = Unresolved",
+    "max_results": 50
+  },
+
+  "web_clipper": {
+    "enabled": false,
+    "_comment": "Obsidian Web Clipper intake path. See llmwiki/web_clipper.py.",
+    "watch_dir": "raw/web",
+    "extensions": [".md"],
+    "auto_queue": true
   }
 }
