@@ -462,6 +462,7 @@ def nav_bar(active: str, link_prefix: str = "") -> str:
       {link("sessions/index.html", "Sessions", "sessions")}
       {link("models/index.html", "Models", "models")}
       {link("vs/index.html", "Compare", "vs")}
+      {link("graph.html", "Graph", "graph")}
       {link("changelog.html", "Changelog", "changelog")}
       <button class="nav-search-btn" id="open-palette" aria-label="Open command palette">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1652,6 +1653,16 @@ def build_site(
         print(f"  wrote {len(ai_paths)} AI-consumable exports: {', '.join(sorted(ai_paths.keys()))}")
     except Exception as e:
         print(f"  warning: AI exports failed: {e}", file=sys.stderr)
+
+    # v1.1 (#118): copy the interactive knowledge graph into the site
+    # so the "Graph" nav link works without a separate `llmwiki graph` step.
+    try:
+        from llmwiki.graph import copy_to_site as copy_graph_to_site
+        graph_path = copy_graph_to_site(out_dir)
+        if graph_path:
+            print(f"  wrote {graph_path.relative_to(out_dir.parent)} (interactive graph viewer)")
+    except Exception as e:
+        print(f"  warning: graph viewer copy failed: {e}", file=sys.stderr)
 
     # v0.4: Per-page sibling .txt and .json
     try:
