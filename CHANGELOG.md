@@ -8,6 +8,10 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ## [Unreleased] — post-v1.0 cleanup
 
+### Refactored
+
+- **Split `llmwiki/build.py` (3,378 → 1,799 lines)** (#217) — new `llmwiki/render/` package with `css.py` (682 lines) and `js.py` (937 lines) housing the previously-inline CSS and JS constants. `build.py` re-exports both for backwards compatibility, so external imports `from llmwiki.build import CSS` still work. Build output verified byte-identical to pre-refactor (same HTML hash). 18 new tests verify byte equivalence, re-export, and content integrity (theme vars, dark mode, command palette, search-index loading). Zero behavior change.
+
 ### Added
 
 - **Docker container + GHCR publish workflow** (#123) — fully fleshed-out Docker deployment. `Dockerfile` now uses OCI-standard labels, runs as non-root `app` user (UID 1000 for host-volume compat), owns the `/wiki` mount point, and defaults to `serve --host 0.0.0.0 --port 8765 --dir site`. `docker-compose.yml` pulls from `ghcr.io/pratiyush/llm-wiki:latest` by default with a `build: .` fallback, bind-mounts `raw/`, `wiki/`, `site/` on the host and `examples/` read-only, adds a healthcheck and `restart: unless-stopped`. New `.github/workflows/docker-publish.yml` builds multi-arch (amd64 + arm64) on every tag push and publishes to GHCR with cache reuse across builds. `docs/deploy/docker.md` covers quick-start, CLI-in-container usage, volume mapping, image details, and troubleshooting. README deployment-targets section expanded with Docker + Vercel/Netlify entries. 31 tests.
