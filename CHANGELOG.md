@@ -10,6 +10,8 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ### Added
 
+- **OpenCode / OpenClaw adapter** (#43) — new `llmwiki/adapters/opencode.py`. Discovers `.jsonl` sessions under `~/.config/opencode/sessions/` (Linux), `~/Library/Application Support/opencode/sessions/` (macOS), and `%APPDATA%/opencode/sessions/` (Windows), plus the equivalent `openclaw/` paths. `normalize_records()` translates OpenCode's `{role, content}` records into the Claude-style `{type, message: {role, content}}` that the shared renderer expects; `tool` role maps to `user` type while preserving the original role. Project slug derivation handles both nested (`<project>/<session>.jsonl`) and flat (`<project>-<session>.jsonl`) layouts. 23 tests.
+
 - **ChatGPT conversation-export adapter** (#44) — new `llmwiki/adapters/chatgpt.py`. Reads `conversations.json` from a user's ChatGPT export (Settings → Data Controls → Export), linearizes the parent→children mapping to recover the active conversation chain, extracts messages with roles + text, renders as frontmatter-tagged markdown. Disabled by default (opt-in via `chatgpt.enabled: true` in config). 28 tests.
 
 - **Shell completion for bash / zsh / fish** (#216) — new `llmwiki/completion.py` + `llmwiki completion <shell>` CLI command. Walks the argparse tree at runtime to enumerate every subcommand + its top-level flags, emits a working completion script. Stdlib-only (no argcomplete dep). Install: `llmwiki completion bash > ~/.bash_completion.d/llmwiki` (or equivalent for zsh / fish). 17 tests.
