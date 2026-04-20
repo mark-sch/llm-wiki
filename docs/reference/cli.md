@@ -248,6 +248,40 @@ underlying bug and the next `sync` retries it. G-14 · #300.
 
 ---
 
+## `backlinks` — inject managed `## Referenced by` blocks
+
+```bash
+python3 -m llmwiki backlinks                               # real run
+python3 -m llmwiki backlinks --dry-run                     # preview
+python3 -m llmwiki backlinks --verbose                     # + top-20 most referenced
+python3 -m llmwiki backlinks --max-entries 100             # custom cap
+python3 -m llmwiki backlinks --prune                       # strip every block
+```
+
+### Flags
+
+| Flag | What |
+|---|---|
+| `--wiki-dir PATH` | Override wiki root (default `./wiki/`) |
+| `--max-entries N` | Max backlinks per page (default 50; truncation footer added) |
+| `--dry-run` | Preview writes without touching disk |
+| `--prune` | Remove every backlink block (inverse of default) |
+| `--verbose` / `-v` | Print top-20 most-referenced pages after injection |
+
+Walks `wiki/` and, for every page that another wiki page links to,
+injects a managed `## Referenced by` section bounded by
+`<!-- BACKLINKS:START --> … <!-- BACKLINKS:END -->` sentinels.
+Rerun is idempotent — the block gets replaced, everything else on the
+page stays intact. Entries are sorted newest-first when referrers
+carry a `date:` field, alphabetical otherwise. Skips `archive/` and
+`_context.md` stubs.
+
+Fixes the orphan problem: before `backlinks`, 95% of wiki pages had no
+inbound link visible on their own page. After, the graph becomes
+navigable + Obsidian renders backlinks natively. #328.
+
+---
+
 ## `references` — list every page linking to an entity
 
 ```bash

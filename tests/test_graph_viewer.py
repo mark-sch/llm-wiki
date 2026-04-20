@@ -111,8 +111,11 @@ def test_template_has_search_input():
 
 
 def test_template_has_click_to_navigate_handler():
-    assert "window.open(sitePath" in HTML_TEMPLATE
+    # #328: template now opens `node.site_url` (precomputed), not a
+    # client-side rewrite. Nodes with site_url=None trigger a tooltip.
+    assert "window.open(node.site_url" in HTML_TEMPLATE
     assert "noopener" in HTML_TEMPLATE
+    assert "_flashNoSiteTooltip" in HTML_TEMPLATE
 
 
 def test_template_has_stats_overlay():
