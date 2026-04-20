@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Versions below 1.0 are pre-production — API and file formats may change.
 
-## [Unreleased] — post-v1.0 cleanup
+## [Unreleased]
+
+## [1.1.0-rc4] — 2026-04-20
+
+Navigation + quality release. Fixed two high-impact usability bugs the
+user surfaced end-to-end: graph clicks went nowhere (99.7% 404) and
+95% of wiki pages were orphans with no backlinks. Plus source-code /
+root-file link routing through GitHub, verify-before-fixing
+contribution rule, and an upgrade guide.
 
 ### Fixed
 

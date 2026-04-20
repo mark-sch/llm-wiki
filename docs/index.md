@@ -70,6 +70,7 @@ searchable, interlinked, and offline. No database, no account, no cloud.
 
 ## Operate
 
+- **[Upgrade guide](UPGRADING.md)** — what changes between releases, migrations, opt-ins.
 - **[FAQ](faq.md)** · **[Troubleshooting](troubleshooting.md)** · **[Privacy](privacy.md)**.
 - **[Testing — visual regression](testing/visual-regression.md)**.
 - **[Accessibility](accessibility.md)** (WCAG 2.1 AA).

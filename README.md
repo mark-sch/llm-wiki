@@ -9,8 +9,8 @@ Rebuilt on every `master` push from the synthetic sessions in [`examples/demo-se
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-v1.1.0--rc3-10B981.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-2162%20passing-10B981.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-v1.1.0--rc4-10B981.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-2271%20passing-10B981.svg)](tests/)
 [![CI](https://github.com/Pratiyush/llm-wiki/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Pratiyush/llm-wiki/actions/workflows/ci.yml)
 [![Link check](https://github.com/Pratiyush/llm-wiki/actions/workflows/link-check.yml/badge.svg?branch=master)](https://github.com/Pratiyush/llm-wiki/actions/workflows/link-check.yml)
 [![Wiki checks](https://github.com/Pratiyush/llm-wiki/actions/workflows/wiki-checks.yml/badge.svg?branch=master)](https://github.com/Pratiyush/llm-wiki/actions/workflows/wiki-checks.yml)
@@ -525,6 +525,8 @@ Per-adapter docs:
 | [v1.0.0](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.0.0) | Production-ready Obsidian integration — full v1.0 scope | `v1.0.0` |
 | [v1.1.0-rc1](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc1) | Solo quick-win sprint — candidates workflow, Ollama scaffold, prompt-cache scaffold | `v1.1.0-rc1` |
 | [v1.1.0-rc2](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc2) | Session E — interactive graph viewer + remaining code-only v1.1 work | `v1.1.0-rc2` |
+| [v1.1.0-rc3](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc3) | Gap-sweep bundle — state portability, quarantine, sync --status, log CLI, synthesize --estimate breakdown, tag family, stale references, graph context menu, raw immutability, AI-sessions default | `v1.1.0-rc3` |
+| [v1.1.0-rc4](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc4) | Navigation + quality — graph `site_url` resolver (99.7% → 0% dead clicks), `llmwiki backlinks` CLI (95% → 0% orphan pages), source-code → GitHub link rewriter (471 → 100 broken), verify-before-fixing contribution rule | `v1.1.0-rc4` |
 
 ## Roadmap
 
