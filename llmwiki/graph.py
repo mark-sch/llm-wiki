@@ -29,9 +29,60 @@ GRAPH_DIR = REPO_ROOT / "graph"
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 
+# #328: wiki-layer pages that have no corresponding site HTML page.
+# Graph clicks on these used to 404 — the viewer now disables the click
+# and shows a tooltip.  We keep the node + edges (for the graph
+# topology) but mark `site_url = None`.
+_NO_SITE_TYPES = {"entities", "concepts", "syntheses", "questions",
+                  "comparisons", "hot", "categories", "projects_meta"}
+_NO_SITE_BASENAMES = {
+    "CRITICAL_FACTS", "MEMORY", "SOUL",
+    "hints", "hot", "dashboard", "overview",
+    "log", "log-archive-2026",
+}
+
+
+def _compute_site_url(text: str, rel_parts: tuple[str, ...],
+                      slug: str, type_: str) -> str | None:
+    """Map a wiki page to its generated site URL (or ``None`` when no
+    site page exists).
+
+    * ``wiki/index.md`` → ``index.html``
+    * ``wiki/projects/<slug>.md`` → ``projects/<slug>.html``
+    * ``wiki/sources/<proj>/<stem>.md`` → the matching ``sessions/<proj>/<date-stem>.html``
+      (looked up from the ``source_file`` frontmatter field, because wiki source
+      pages use bare slugs but site session pages use date-prefixed stems).
+    * entities / concepts / syntheses / nav files → None
+
+    Never raises — returns ``None`` on any lookup miss so the caller can
+    gracefully disable the click.
+    """
+    if slug == "index" and len(rel_parts) == 1:
+        return "index.html"
+    if len(rel_parts) >= 2 and rel_parts[0] == "projects":
+        return f"projects/{slug}.html"
+    if len(rel_parts) >= 2 and rel_parts[0] == "sources":
+        # Find the matching site/sessions/ path via the source_file frontmatter.
+        m = re.search(r"^source_file:\s*(.+)$", text, re.MULTILINE)
+        if not m:
+            return None
+        sf = m.group(1).strip().strip("'\"")
+        # sf looks like ``raw/sessions/<proj>/<stem>.md`` or ``raw/sessions/<stem>.md``
+        try:
+            rel = sf.split("raw/sessions/", 1)[1]
+        except IndexError:
+            return None
+        rel = rel.removesuffix(".md")
+        return f"sessions/{rel}.html"
+    if type_ in _NO_SITE_TYPES:
+        return None
+    if slug in _NO_SITE_BASENAMES:
+        return None
+    return None
+
 
 def scan_pages() -> dict[str, dict[str, Any]]:
-    """Return a dict {slug: {path, type, title, out_links}}."""
+    """Return a dict {slug: {path, type, title, out_links, site_url}}."""
     pages: dict[str, dict[str, Any]] = {}
     if not WIKI_DIR.exists():
         return pages
@@ -56,17 +107,46 @@ def scan_pages() -> dict[str, dict[str, Any]]:
             title = title_match.group(1).strip('"')
         # Extract wikilinks
         out_links = set(WIKILINK_RE.findall(text))
+        site_url = _compute_site_url(text, rel.parts, slug, type_)
         pages[slug] = {
             "path": str(p.relative_to(REPO_ROOT)),
             "type": type_,
             "title": title,
             "out_links": out_links,
+            "site_url": site_url,
         }
     return pages
 
 
-def build_graph() -> dict[str, Any]:
+def _verify_site_url(site_url: str | None, site_dir: Path | None) -> str | None:
+    """Return ``site_url`` unchanged if the file exists, else ``None``.
+
+    #328: prevents the viewer from offering links that 404.  When
+    ``site_dir`` is ``None`` (graph built before the site has been
+    compiled) we keep the URL as-is — the caller is telling us the
+    site doesn't exist yet, and we'd rather have a 404 than drop
+    every session link.
+    """
+    if not site_url or site_dir is None:
+        return site_url
+    if not site_dir.is_dir():
+        return site_url
+    return site_url if (site_dir / site_url).is_file() else None
+
+
+def build_graph(verify_site_dir: Path | None = None) -> dict[str, Any]:
+    """Build the knowledge graph.
+
+    ``verify_site_dir``: when given and the directory exists, each
+    node's ``site_url`` is validated against the compiled site — URLs
+    pointing at non-existent files are nulled so the viewer shows a
+    graceful tooltip instead of 404ing.  Defaults to ``site/`` under
+    ``REPO_ROOT`` when called from ``copy_to_site`` (see below).
+    """
     pages = scan_pages()
+    if verify_site_dir is not None:
+        for p in pages.values():
+            p["site_url"] = _verify_site_url(p.get("site_url"), verify_site_dir)
 
     # Compute in-degree
     in_deg: dict[str, int] = {slug: 0 for slug in pages}
@@ -84,6 +164,9 @@ def build_graph() -> dict[str, Any]:
                 "label": page["title"],
                 "type": page["type"],
                 "path": page["path"],
+                # #328: map wiki page → real site HTML URL so clicks don't 404.
+                # None for pages that have no compiled site page.
+                "site_url": page.get("site_url"),
                 "in_degree": in_deg.get(slug, 0),
                 "out_degree": len(page["out_links"]),
             }
@@ -446,19 +529,37 @@ function main() {
     interaction: { hover: true, tooltipDelay: 120 },
   });
 
-  // ─── Click-to-navigate ───────────────────────────────────────────────
+  // ─── Click-to-navigate (#328) ────────────────────────────────────────
+  // Use the precomputed `site_url` on each node instead of rewriting
+  // paths client-side. Nodes without a compiled site page (entities,
+  // concepts, nav files) have site_url === null — click shows a
+  // transient tooltip instead of opening a broken link.
   network.on('click', params => {
-    if (params.nodes && params.nodes.length) {
-      const node = nodes.get(params.nodes[0]);
-      if (node && node.path) {
-        // Convert wiki path to site path: wiki/entities/Foo.md → entities/Foo.html
-        const sitePath = node.path
-          .replace(/^wiki\//, '')
-          .replace(/\.md$/, '.html');
-        window.open(sitePath, '_blank', 'noopener');
-      }
+    if (!params.nodes || !params.nodes.length) return;
+    const node = nodes.get(params.nodes[0]);
+    if (!node) return;
+    if (node.site_url) {
+      window.open(node.site_url, '_blank', 'noopener');
+    } else {
+      _flashNoSiteTooltip(node, params.event);
     }
   });
+
+  // Transient "no page" hint for entity / concept / nav nodes.
+  function _flashNoSiteTooltip(node, ev) {
+    const tip = document.createElement('div');
+    tip.textContent = node.label + ' — no compiled page (see ## Connections)';
+    tip.style.cssText =
+      'position:fixed;z-index:50;padding:6px 10px;border-radius:6px;' +
+      'background:var(--g-panel);border:1px solid var(--g-border);' +
+      'color:var(--g-muted);font-size:0.78rem;' +
+      'pointer-events:none;transition:opacity 0.3s;';
+    tip.style.left = (ev.clientX + 12) + 'px';
+    tip.style.top = (ev.clientY + 12) + 'px';
+    document.body.appendChild(tip);
+    setTimeout(() => { tip.style.opacity = '0'; }, 1400);
+    setTimeout(() => { tip.remove(); }, 1800);
+  }
 
   // ─── G-19 (#305): node context menu ──────────────────────────────────
   const ctxMenu = document.getElementById('ctx-menu');
@@ -554,9 +655,13 @@ function main() {
     hideContextMenu();
     switch (action) {
       case 'open': {
-        if (node.path) {
-          const sitePath = node.path.replace(/^wiki\//, '').replace(/\.md$/, '.html');
-          window.open(sitePath, '_blank', 'noopener');
+        // #328: use precomputed site_url so nodes without a compiled
+        // page degrade gracefully instead of 404.
+        if (node.site_url) {
+          window.open(node.site_url, '_blank', 'noopener');
+        } else {
+          alert(node.label + ' — no compiled page exists for this node. '
+            + 'Entities, concepts, and nav files live in wiki/ but aren\u2019t rendered as standalone site pages.');
         }
         break;
       }
@@ -677,7 +782,9 @@ def copy_to_site(site_dir: Path, *, graph: Optional[dict[str, Any]] = None) -> O
 
     Returns the path written, or ``None`` when the wiki has no pages.
     """
-    g = graph or build_graph()
+    # #328: verify site_urls against the actual compiled site so dead
+    # links get nulled to the graceful "no page" tooltip.
+    g = graph or build_graph(verify_site_dir=site_dir)
     if not g.get("nodes"):
         return None
     out = site_dir / "graph.html"

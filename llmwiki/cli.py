@@ -324,6 +324,47 @@ def cmd_graph(args: argparse.Namespace) -> int:
     return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
 
 
+def cmd_backlinks(args: argparse.Namespace) -> int:
+    """Inject managed ``## Referenced by`` sections into every
+    wiki page that something else links to (#328).
+
+    Builds the reverse-reference index and rewrites each target page's
+    sentinel-bounded backlinks block.  Idempotent: rerun flips the
+    content but leaves the rest of the page untouched.  Pair with
+    ``--dry-run`` to preview.  Use ``--prune`` to strip every block
+    back out.
+    """
+    from llmwiki import backlinks as _b
+
+    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
+    if not wiki_dir.is_dir():
+        print(f"error: wiki directory not found: {wiki_dir}", file=sys.stderr)
+        return 2
+
+    if args.prune:
+        n = _b.prune_all(wiki_dir, dry_run=args.dry_run)
+        prefix = "[dry-run] " if args.dry_run else ""
+        print(f"{prefix}removed backlink blocks from {n} page(s)")
+        return 0
+
+    results = _b.inject_all(
+        wiki_dir,
+        max_entries=args.max_entries,
+        dry_run=args.dry_run,
+    )
+    prefix = "[dry-run] " if args.dry_run else ""
+    total_backlinks = sum(results.values())
+    print(
+        f"{prefix}wrote backlink blocks to {len(results)} page(s); "
+        f"{total_backlinks} total inbound reference(s)."
+    )
+    if args.verbose:
+        print()
+        for slug, n in sorted(results.items(), key=lambda x: -x[1])[:20]:
+            print(f"  {slug}: {n} referrer(s)")
+    return 0
+
+
 def cmd_references(args: argparse.Namespace) -> int:
     """Enumerate every page linking to ``<entity>`` (G-17 · #303).
 
@@ -1362,6 +1403,24 @@ def build_parser() -> argparse.ArgumentParser:
     quar_retry = quar_sub.add_parser("retry", help="Print retry plan")
     quar_retry.add_argument("--adapter", help="Filter by adapter name")
     quar.set_defaults(func=cmd_quarantine, action=None)
+
+    # backlinks (#328)
+    blinks = sub.add_parser(
+        "backlinks",
+        help="Inject managed `## Referenced by` blocks into every linked-to page",
+    )
+    blinks.add_argument("--wiki-dir", type=Path, default=None)
+    blinks.add_argument(
+        "--max-entries", type=int, default=50,
+        help="Max backlinks per page (default 50; truncation note added below)",
+    )
+    blinks.add_argument("--dry-run", action="store_true",
+                        help="Preview writes without touching disk")
+    blinks.add_argument("--prune", action="store_true",
+                        help="Remove every backlink block")
+    blinks.add_argument("--verbose", "-v", action="store_true",
+                        help="Print top-20 most-referenced pages after injection")
+    blinks.set_defaults(func=cmd_backlinks)
 
     # references (G-17 · #303)
     refs = sub.add_parser(

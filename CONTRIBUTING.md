@@ -24,9 +24,10 @@ Thanks for wanting to contribute. This project follows strict rules about commit
 4. **No new runtime deps.** Stdlib + `markdown` only. Viewer loads highlight.js from a CDN — no server-side parser needed.
 5. **Tests must pass.** Run `python3 -m pytest tests/ -q` before pushing. CI runs on Python 3.9 + 3.12.
 6. **Every PR ships docs + CHANGELOG + release-note bullet.** For every user-visible change update (a) `CHANGELOG.md` under `## [Unreleased]`, (b) any `docs/tutorials/*` / `docs/reference/*` / `README.md` / inline `--help` that describes the touched surface, and (c) a one-line release-note bullet either in the CHANGELOG entry or in the PR body so `gh release create` can pick it up. PRs adding a new CLI subcommand, slash command, config key, or lint rule MUST add the matching row to `docs/reference/*.md` in the same PR. CI enforces the CHANGELOG check; reviewers check the rest.
-7. **Open an issue first** for anything bigger than a one-file fix. Keeps scope aligned.
+7. **Verify old issues before fixing them.** Issues accumulate; some are fixed via side-effect, some describe problems that no longer reproduce, some refer to modules that have since been refactored. Before changing code for a stale issue: (a) reproduce the problem on current `master` — shell command, click-path, or test that fails; (b) re-read the issue's linked code paths to confirm they still exist. If the bug is gone, close with a one-line comment citing the commit that resolved it (`gh issue close N --reason completed --comment "resolved in <sha>"`); if the description is wrong but there's a real bug nearby, file a new precise issue and link to the old one. Never ship a speculative fix — if you can't reproduce, say so in the PR body.
+8. **Open an issue first** for anything bigger than a one-file fix. Keeps scope aligned.
 
-That's it. If you follow those seven rules your PR is 90% of the way through review.
+That's it. If you follow those eight rules your PR is 90% of the way through review.
 
 ## Code of conduct
 
