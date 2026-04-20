@@ -316,6 +316,38 @@ def cmd_graph(args: argparse.Namespace) -> int:
     return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
 
 
+def cmd_references(args: argparse.Namespace) -> int:
+    """Enumerate every page linking to ``<entity>`` (G-17 · #303).
+
+    Output sorted by source path (so diffs are stable).  Pair with
+    ``llmwiki lint --rule stale_reference_detection`` to surface the
+    *stale* ones.
+    """
+    from llmwiki.lint import load_pages
+    from llmwiki import references as _refs
+
+    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
+    if not wiki_dir.is_dir():
+        print(f"error: wiki directory not found: {wiki_dir}", file=sys.stderr)
+        return 2
+
+    pages = load_pages(wiki_dir)
+    hits = _refs.find_references_to(args.entity, pages)
+    print(_refs.format_references_table(hits))
+
+    if hits and args.with_dated_claims:
+        print()
+        claim_refs = [r for r in hits if r.dated_claims]
+        if claim_refs:
+            print(f"{len(claim_refs)} referrer(s) have dated claims:")
+            for r in claim_refs:
+                print(f"  {r.source}:")
+                for claim in r.dated_claims:
+                    excerpt = claim if len(claim) < 120 else claim[:117] + "..."
+                    print(f"    • {excerpt}")
+    return 0
+
+
 def cmd_tag(args: argparse.Namespace) -> int:
     """Tag-space curation (G-15 · #301).
 
@@ -1322,6 +1354,19 @@ def build_parser() -> argparse.ArgumentParser:
     quar_retry = quar_sub.add_parser("retry", help="Print retry plan")
     quar_retry.add_argument("--adapter", help="Filter by adapter name")
     quar.set_defaults(func=cmd_quarantine, action=None)
+
+    # references (G-17 · #303)
+    refs = sub.add_parser(
+        "references",
+        help="List every page linking to an entity or concept (G-17)",
+    )
+    refs.add_argument("entity", help="Slug of the target page (case-sensitive)")
+    refs.add_argument("--wiki-dir", type=Path, default=None)
+    refs.add_argument(
+        "--with-dated-claims", action="store_true",
+        help="Also print each referrer's dated claims about the target",
+    )
+    refs.set_defaults(func=cmd_references)
 
     # tag family (G-15 · #301 + G-16 · #302)
     tag = sub.add_parser("tag", help="Curate wiki tags (list / add / rename / check / convention)")

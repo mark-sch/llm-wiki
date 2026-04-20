@@ -248,6 +248,29 @@ underlying bug and the next `sync` retries it. G-14 · #300.
 
 ---
 
+## `references` — list every page linking to an entity
+
+```bash
+python3 -m llmwiki references RAG
+python3 -m llmwiki references RAG --with-dated-claims
+python3 -m llmwiki references AndrejKarpathy --wiki-dir other-wiki/
+```
+
+### Flags
+
+| Flag | What |
+|---|---|
+| `--wiki-dir PATH` | Override wiki root (default `./wiki/`) |
+| `--with-dated-claims` | Also print each referrer's dated claims about the target |
+
+Reverse-reference index over the whole wiki. Output is one row per
+referring page, sorted by source path for stable diffs. Pair with the
+`stale_reference_detection` lint rule (rule #15) to surface *stale*
+referrers — pages with dated claims about a target that's since been
+updated. G-17 · #303.
+
+---
+
 ## `tag` — curate the wiki tag-space
 
 ```bash
