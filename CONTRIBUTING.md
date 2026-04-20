@@ -23,7 +23,7 @@ Thanks for wanting to contribute. This project follows strict rules about commit
 3. **Never commit real session data.** `raw/sessions/` is gitignored. Fixtures must be synthetic or heavily redacted.
 4. **No new runtime deps.** Stdlib + `markdown` only. Viewer loads highlight.js from a CDN — no server-side parser needed.
 5. **Tests must pass.** Run `python3 -m pytest tests/ -q` before pushing. CI runs on Python 3.9 + 3.12.
-6. **Add a CHANGELOG entry** under `## [Unreleased]` for every user-visible change.
+6. **Every PR ships docs + CHANGELOG + release-note bullet.** For every user-visible change update (a) `CHANGELOG.md` under `## [Unreleased]`, (b) any `docs/tutorials/*` / `docs/reference/*` / `README.md` / inline `--help` that describes the touched surface, and (c) a one-line release-note bullet either in the CHANGELOG entry or in the PR body so `gh release create` can pick it up. PRs adding a new CLI subcommand, slash command, config key, or lint rule MUST add the matching row to `docs/reference/*.md` in the same PR. CI enforces the CHANGELOG check; reviewers check the rest.
 7. **Open an issue first** for anything bigger than a one-file fix. Keeps scope aligned.
 
 That's it. If you follow those seven rules your PR is 90% of the way through review.

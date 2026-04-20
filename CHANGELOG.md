@@ -8,6 +8,10 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ## [Unreleased] — post-v1.0 cleanup
 
+### Changed
+
+- **Contribution rule made explicit: every PR ships docs + CHANGELOG + release-note bullet** — previously the rule lived only in the plan file. Now codified in `CONTRIBUTING.md` rule #6 (the "seven rules" intro) and the PR template's pre-merge checklist. PRs adding a new CLI subcommand, slash command, config key, or lint rule MUST update the matching `docs/reference/*.md` table in the same PR. CI already blocks merges missing a CHANGELOG diff; this codifies the expectation so first-time contributors don't discover it at merge time.
+
 ### Fixed
 
 - **`raw/` immutability guardrail + AI-sessions-only default** (#326) — `CLAUDE.md` rule 1 was documentation-only. Now runtime-enforced: `_raw_write_guard()` refuses to overwrite any existing `raw/` file unless `llmwiki sync --force` is passed explicitly. Overwrite attempts are recorded in `.llmwiki-quarantine.json` (shipped in #300) with a clear reason, so the operator sees exactly what would have been clobbered. New `is_ai_session` class attribute on `BaseAdapter` classifies adapters; `obsidian`, `jira`, `meeting`, and `pdf` are marked `is_ai_session = False` and are now **opt-in only** — `llmwiki sync` with no flags no longer silently walks a user's personal Obsidian vault. `llmwiki adapters` column `will_fire` now reflects the classification (Obsidian: `auto no` unless explicitly enabled). 10 new tests in `tests/test_raw_immutability.py`: guard passes / raises / force-bypasses / error message formatting, every AI adapter marked, every non-AI adapter marked, default selection skips non-AI, explicit-enable includes non-AI.
