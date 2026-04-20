@@ -316,6 +316,103 @@ def cmd_graph(args: argparse.Namespace) -> int:
     return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
 
 
+def cmd_tag(args: argparse.Namespace) -> int:
+    """Tag-space curation (G-15 · #301).
+
+    Subcommands:
+      list                   — every tag + usage count
+      add <tag> <page>       — append to a page's frontmatter
+      rename <old> <new>     — rewrite across every page (supports --dry-run)
+      check                  — flag near-duplicate tags
+      convention             — G-16: topics-vs-tags misuse
+    """
+    from llmwiki import tags as _tags
+
+    action = getattr(args, "action", None) or "list"
+    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
+
+    entries = _tags.collect_tags(wiki_dir)
+
+    if action == "list":
+        counts = _tags.count_tags(entries)
+        print(_tags.format_tag_table(counts))
+        if counts:
+            print()
+            print(f"Total: {len(counts)} unique tag(s), {sum(counts.values())} occurrence(s)")
+        return 0
+
+    if action == "add":
+        if not args.tag or not args.page:
+            print("error: tag and page are required", file=sys.stderr)
+            return 2
+        try:
+            changed = _tags.add_tag_to_page(
+                args.tag, Path(args.page), field=args.field
+            )
+        except (FileNotFoundError, ValueError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        if changed:
+            print(f"Added tag {args.tag!r} to {args.page}")
+        else:
+            print(f"Tag {args.tag!r} already present on {args.page}")
+        return 0
+
+    if action == "rename":
+        if not args.old or not args.new:
+            print("error: old and new tags are required", file=sys.stderr)
+            return 2
+        try:
+            touched = _tags.rename_tag(
+                args.old, args.new,
+                wiki_dir=wiki_dir,
+                dry_run=args.dry_run,
+            )
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        total = sum(touched.values())
+        prefix = "[dry-run] " if args.dry_run else ""
+        if total == 0:
+            print(f"{prefix}No occurrences of {args.old!r} found.")
+        else:
+            print(
+                f"{prefix}Rewrote {args.old!r} → {args.new!r} in "
+                f"{len(touched)} page(s), {total} occurrence(s)."
+            )
+            for p, n in sorted(touched.items()):
+                rel = p.relative_to(wiki_dir.parent) if wiki_dir.parent in p.parents else p
+                print(f"  {rel}  ({n})")
+        return 0
+
+    if action == "check":
+        near = _tags.near_duplicate_tags(entries, threshold=args.threshold)
+        if not near:
+            print("No near-duplicate tags found.")
+            return 0
+        print(f"Found {len(near)} near-duplicate pair(s) (threshold {args.threshold}):")
+        for a, b, ratio in near:
+            print(f"  {a!r}  ~  {b!r}  ({ratio:.2f})")
+        return 0
+
+    if action == "convention":
+        viols = _tags.convention_violations(entries)
+        if not viols:
+            print("No convention violations (G-16 · #302).")
+            return 0
+        print(
+            f"Found {len(viols)} convention violation(s): "
+            "sources/entities/concepts should use `tags:`, projects should use `topics:`."
+        )
+        for page, expected, actual in viols:
+            rel = page.relative_to(wiki_dir.parent) if wiki_dir.parent in page.parents else page
+            print(f"  {rel}: uses `{actual}:` but should use `{expected}:`")
+        return 0
+
+    print(f"error: unknown tag action {action!r}", file=sys.stderr)
+    return 2
+
+
 def cmd_log(args: argparse.Namespace) -> int:
     """Query ``wiki/log.md`` structurally (G-13 · #299).
 
@@ -1225,6 +1322,37 @@ def build_parser() -> argparse.ArgumentParser:
     quar_retry = quar_sub.add_parser("retry", help="Print retry plan")
     quar_retry.add_argument("--adapter", help="Filter by adapter name")
     quar.set_defaults(func=cmd_quarantine, action=None)
+
+    # tag family (G-15 · #301 + G-16 · #302)
+    tag = sub.add_parser("tag", help="Curate wiki tags (list / add / rename / check / convention)")
+    tag_sub = tag.add_subparsers(dest="action")
+    tag_list = tag_sub.add_parser("list", help="List every tag + usage count")
+    tag_list.add_argument("--wiki-dir", type=Path, default=None)
+    tag_add = tag_sub.add_parser("add", help="Add a tag to a page's frontmatter")
+    tag_add.add_argument("tag", help="Tag to add")
+    tag_add.add_argument("page", help="Target wiki page (path)")
+    tag_add.add_argument(
+        "--field", choices=["tags", "topics"], default="tags",
+        help="Frontmatter field (default: tags; use topics for projects)",
+    )
+    tag_add.add_argument("--wiki-dir", type=Path, default=None)
+    tag_rename = tag_sub.add_parser("rename", help="Rewrite a tag across every page")
+    tag_rename.add_argument("old", help="Old tag")
+    tag_rename.add_argument("new", help="New tag")
+    tag_rename.add_argument("--dry-run", action="store_true")
+    tag_rename.add_argument("--wiki-dir", type=Path, default=None)
+    tag_check = tag_sub.add_parser("check", help="Flag near-duplicate tags")
+    tag_check.add_argument(
+        "--threshold", type=float, default=0.85,
+        help="Similarity cutoff (0.0–1.0, default 0.85)",
+    )
+    tag_check.add_argument("--wiki-dir", type=Path, default=None)
+    tag_conv = tag_sub.add_parser(
+        "convention",
+        help="G-16: flag sources using `topics:` or projects using `tags:`",
+    )
+    tag_conv.add_argument("--wiki-dir", type=Path, default=None)
+    tag.set_defaults(func=cmd_tag, action=None)
 
     # log (G-13 · #299)
     log_p = sub.add_parser(

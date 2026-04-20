@@ -334,7 +334,8 @@ def test_lint_rule_silent_on_healthy_wiki(tmp_path: Path):
 # ─── Registry count guard ─────────────────────────────────────────────
 
 
-def test_lint_registry_grew_to_13():
-    """Sanity: we bumped from 12 (after #51) to 13 (after #52)."""
+def test_lint_registry_is_at_least_13():
+    """Sanity: we bumped from 12 (after #51) to 13 (after #52).
+    Further rules are allowed (e.g. tags_topics_convention in #302)."""
     from llmwiki.lint import rules  # noqa: F401 — force registration
-    assert len(REGISTRY) == 13
+    assert len(REGISTRY) >= 13

@@ -248,6 +248,41 @@ underlying bug and the next `sync` retries it. G-14 · #300.
 
 ---
 
+## `tag` — curate the wiki tag-space
+
+```bash
+python3 -m llmwiki tag list                    # every tag + usage count
+python3 -m llmwiki tag add claude-code sources/foo.md
+python3 -m llmwiki tag rename obsidian Obsidian --dry-run
+python3 -m llmwiki tag rename obsidian Obsidian         # do it
+python3 -m llmwiki tag check --threshold 0.85
+python3 -m llmwiki tag convention              # G-16 violations
+```
+
+### Subcommands
+
+| Subcommand | What |
+|---|---|
+| `list` | Sort-by-count table of every tag in `wiki/` |
+| `add <tag> <page>` | Append to a page's frontmatter (idempotent) |
+| `rename <old> <new>` | Rewrite across every page; pair with `--dry-run` first |
+| `check` | Near-duplicate detector (case-insensitive, SequenceMatcher) |
+| `convention` | Flag projects using `tags:` / sources using `topics:` (G-16) |
+
+### Flags (per subcommand)
+
+| Subcommand | Flag | What |
+|---|---|---|
+| `list` / `check` / `convention` | `--wiki-dir <path>` | Override wiki root |
+| `add` | `--field {tags,topics}` | Target frontmatter field (default `tags`) |
+| `rename` | `--dry-run` | Preview without writing |
+| `check` | `--threshold 0.0–1.0` | Similarity cutoff (default 0.85) |
+
+G-15 · #301. Pairs with the `tags_topics_convention` lint rule
+(G-16 · #302, rule #14) that fires on every `llmwiki lint` run.
+
+---
+
 ## `log` — query `wiki/log.md` structurally
 
 ```bash
