@@ -8,7 +8,22 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ## [Unreleased]
 
+### Added
+
+- **Graphify integration** (#364) — `pip install llmwiki[graph]` adds `graphifyy` as optional dependency. New `graphify_bridge.py` module provides AI-powered knowledge graph building via tree-sitter AST extraction, Leiden community detection, and confidence-scored edges. Run with `llmwiki graph --engine graphify`.
+
 ### Changed
+
+- **Simplify adapters — core vs contrib split** (#363) — 3 core adapters auto-discovered (claude_code, codex_cli, obsidian). 6 adapters moved to `adapters/contrib/` (chatgpt, copilot, cursor, gemini, opencode). 3 non-session adapters deleted (jira, meeting, pdf).
+- **Slim CLI from 25 to 11 subcommands** (#362) — removed quarantine, backlinks, references, tag, log, watch, export-obsidian, export-marp/jupyter/qmd, check-links, manifest, install-skills, link-obsidian, completion.
+
+### Removed
+
+- **9 dead-weight modules** (#360) — prototypes, auto_dream, visual_baselines, cache_tiers, eval, web_clipper, scheduled_sync, reader_shell, image_pipeline (~5K lines).
+- **3 niche exporters** (#361) — export_marp, export_jupyter, export_qmd (~800 lines).
+- **3 non-session adapters** — jira_adapter, meeting, pdf (~600 lines).
+- **14 CLI subcommands** — replaced by core commands or deferred to skills.
+- **89 stale git branches** cleaned up.
 
 - **Live adoption of `cache_tier` + `reader_shell` on seeded wiki pages** (#285) — 6 committed wiki pages now carry explicit `cache_tier` (4× L2, 2× L1) and 2 have `reader_shell: true`. The `cache_tier_consistency` lint rule now runs against real data and correctly flags the 2 L1 pages as needing inbound wikilinks (which is useful, actionable info). `docs/reference/cache-tiers.md` + `docs/reference/reader-shell.md` gain "Live adopters" sections listing the opt-in pages + why each tier was picked. Closes the loop on two features that shipped scaffolds + tests + docs but had zero real adoption.
 
