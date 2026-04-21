@@ -44,17 +44,34 @@ def _write_jsonl(path: Path, session_id: str, iso_ts: str,
     )
 
 
-def _seed_env(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """Seed a tmp_path repo + fake ~/.claude/projects/ source."""
+def _seed_env(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """Seed a tmp_path repo + fake ~/.claude/projects/ source tree.
+
+    Returns ``(home, project_dir, out_dir, state)``.  ``project_dir`` is
+    already one level inside the store root so the adapter derives a
+    stable project slug for every file under it.
+    """
     home = tmp_path / "home"
     home.mkdir()
-    cc_projects = home / ".claude" / "projects" / "my-proj"
+    # Store root (what the adapter scans) AND the project-dir within it.
+    store_root = home / ".claude" / "projects"
+    project_dir = store_root / "my-proj"
     out_dir = tmp_path / "repo" / "raw" / "sessions"
     state = tmp_path / "state.json"
-    return home, cc_projects, out_dir, state
+    return home, project_dir, out_dir, state
 
 
 def _patch(monkeypatch, home, out_dir, state):
+    # ClaudeCodeAdapter.session_store_path is a class-level attribute
+    # evaluated at class-definition time, so we have to patch the class
+    # itself instead of relying on Path.home monkeypatching.  Point it
+    # at the `projects/` directory so `derive_project_slug()` resolves
+    # every file under it against that prefix.
+    from llmwiki.adapters.claude_code import ClaudeCodeAdapter
+    store = home / ".claude" / "projects"
+    monkeypatch.setattr(
+        ClaudeCodeAdapter, "session_store_path", store, raising=False,
+    )
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
     monkeypatch.setattr(c, "DEFAULT_STATE_FILE", state)
     monkeypatch.setattr(c, "REPO_ROOT", home.parent / "repo")
@@ -62,18 +79,16 @@ def _patch(monkeypatch, home, out_dir, state):
 
 def test_subagent_collision_is_resolved_with_hash_suffix(tmp_path, monkeypatch):
     """Parent + subagent that share start-time + slug both land on disk."""
-    home, cc, out_dir, state = _seed_env(tmp_path)
+    home, proj, out_dir, state = _seed_env(tmp_path)
 
     ts = "2026-04-16T10:00:00Z"
-    parent = cc / "sess-uuid" / "parent.jsonl"
-    sub = cc / "sess-uuid" / "subagents" / "agent-aprompt-abc.jsonl"
-    _write_jsonl(parent, "sess-uuid-1111", ts)
-    _write_jsonl(sub, "sess-uuid-1111", ts)
+    parent = proj / "parent.jsonl"
+    sub = proj / "subagents" / "agent-aprompt-abc.jsonl"
+    _write_jsonl(parent, "sess-uuid-1111", ts, slug="shared-slug")
+    _write_jsonl(sub, "sess-uuid-1111", ts, slug="shared-slug")
 
     _patch(monkeypatch, home, out_dir, state)
 
-    # Force the adapter to be claude_code only so we don't drag in
-    # obsidian / others from the test environment.
     c.discover_adapters()
     rc = c.convert_all(
         adapters=["claude_code"],
@@ -82,31 +97,27 @@ def test_subagent_collision_is_resolved_with_hash_suffix(tmp_path, monkeypatch):
         include_current=True,  # include even very-recent test files
         force=False,
     )
-    assert rc in (0, 1)  # some adapters may error for other reasons
+    assert rc in (0, 1)
 
-    # Both sources should have produced an output file.
     outs = sorted(out_dir.rglob("*.md"))
-    # There should be at least two distinct files with the same date+slug
-    # base, one with a --<hash> suffix.
     disambig = [p for p in outs if "--" in p.name]
     canonical = [p for p in outs if "--" not in p.name]
     assert canonical, f"canonical name missing; got {outs}"
-    # The subagent's file should carry the disambiguator suffix.
-    # (If both are the subagent, we still land the second; the first
-    # run is canonical because nothing existed yet.)
     assert disambig, f"disambiguated file missing; got {outs}"
 
 
 def test_second_source_with_identical_canonical_name_gets_hash(tmp_path, monkeypatch):
-    """Write one source, then simulate a second distinct source that
-    would produce the same canonical name — expect it to get a hash."""
-    home, cc, out_dir, state = _seed_env(tmp_path)
+    """Two sources produce the same canonical name; second gets a hash."""
+    home, proj, out_dir, state = _seed_env(tmp_path)
     ts = "2026-04-16T10:00:00Z"
 
-    s1 = cc / "session-a.jsonl"
-    s2 = cc / "subagents" / "agent-aa.jsonl"
-    _write_jsonl(s1, "same-session-id", ts)
-    _write_jsonl(s2, "same-session-id", ts)
+    # Both directly in the project dir so derive_project_slug gives the
+    # same value for both, AND both carry the same pinned slug so
+    # flat_output_name produces identical canonical filenames.
+    s1 = proj / "session-a.jsonl"
+    s2 = proj / "session-b.jsonl"
+    _write_jsonl(s1, "same-session-id", ts, slug="shared-slug")
+    _write_jsonl(s2, "same-session-id", ts, slug="shared-slug")
 
     _patch(monkeypatch, home, out_dir, state)
 
@@ -115,7 +126,6 @@ def test_second_source_with_identical_canonical_name_gets_hash(tmp_path, monkeyp
                   state_file=state, include_current=True)
 
     outs = sorted(out_dir.rglob("*.md"))
-    # At least one canonical + one disambiguated.
     canonical = [p for p in outs if "--" not in p.name]
     disambig = [p for p in outs if "--" in p.name]
     assert len(outs) >= 2
@@ -126,8 +136,8 @@ def test_second_source_with_identical_canonical_name_gets_hash(tmp_path, monkeyp
 def test_resync_same_source_is_idempotent(tmp_path, monkeypatch):
     """Re-running sync on the same jsonl doesn't explode into
     <canonical> + <hash1> + <hash2> — the state key protects us."""
-    home, cc, out_dir, state = _seed_env(tmp_path)
-    _write_jsonl(cc / "s.jsonl", "x", "2026-04-16T10:00:00Z")
+    home, proj, out_dir, state = _seed_env(tmp_path)
+    _write_jsonl(proj / "s.jsonl", "x", "2026-04-16T10:00:00Z")
     _patch(monkeypatch, home, out_dir, state)
 
     c.discover_adapters()
