@@ -325,7 +325,10 @@ _SOURCE_CODE_EXTS = (
     ".Dockerfile", ".env",
 )
 _ROOT_ONLY_MD_BASENAMES = {
-    "README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
+    # #284: README.md + CONTRIBUTING.md now compile to site HTML, so
+    # they're NOT in this list — the .md→.html pass routes them to the
+    # compiled page inside the site.
+    "CODE_OF_CONDUCT.md",
     "CLAUDE.md", "AGENTS.md", "SECURITY.md", "RELEASE-NOTES.md",
     "LICENSE", ".gitignore", ".env", ".editorconfig",
 }
@@ -370,6 +373,121 @@ def _rewrite_one_to_github(href: str) -> str | None:
         md_path = path_no_fragment.rsplit("/", 1)[0] + "/" + md_name if "/" in path_no_fragment else md_name
         return f"{_GITHUB_BLOB_URL}/{md_path}"
     return None
+
+
+_SESSION_LOCAL_BASENAMES = {
+    "tasks.md", "CHANGELOG.md", "_progress.md",
+    "user_profile.md", "user_pratiyush.md",
+    "RELEASE-NOTES.md", "notes.md", "TODO.md",
+    "plan.md", "roadmap.md",
+}
+
+
+def _is_session_local_ref(href: str, source_path_prefix: str = "sessions/") -> bool:
+    """Heuristic: href is a project-local reference that won't resolve
+    anywhere in the compiled site (#336).
+
+    Applied to session transcripts, which routinely inline references
+    to files that exist in the user's project but not in the compiled
+    wiki: ``tasks.md``, ``settings.gradle.kts``, ``../../sources/foo.md``,
+    absolute ``/Users/…/…``, IDE config like ``.kiro/steering/*``.  We'd
+    rather keep the filename visible as plain text and drop the (broken)
+    anchor than ship a 404.
+    """
+    # Strip trailing #anchor / ?query.  Keep leading ./ and ../
+    # prefixes — the classifier uses them to recognise wiki-layer paths.
+    path = href.split("#", 1)[0].split("?", 1)[0]
+    if not path:
+        return False
+    if path.startswith(("http:", "https:", "mailto:")):
+        return False
+    # Absolute host paths (e.g. /Users/USER/.claude/...) — always dead.
+    if path.startswith(("/Users/", "/home/", "/root/", "/tmp/")):
+        return True
+    # Regular site-absolute paths shouldn't be stripped.
+    if path.startswith("/"):
+        return False
+    # Drop ONLY the ``./`` prefix (strip explicit "./" once, keep "../").
+    if path.startswith("./"):
+        path = path[2:]
+    # For the basename check we want the last path segment.
+    base = path.rsplit("/", 1)[-1]
+    if base in _SESSION_LOCAL_BASENAMES:
+        return True
+    # ../../sources/ and ../../wiki/ — wiki-layer targets that don't
+    # compile as standalone site pages.
+    if path.startswith((
+        "../../sources/", "../sources/", "sources/",
+        "../../wiki/", "../../entities/", "../../concepts/",
+        "../../syntheses/",
+    )):
+        return True
+    # IDE / project config dirs that live in the user's repo but not ours.
+    if path.startswith((
+        ".kiro/", ".cursor/", ".vscode/", ".idea/",
+        ".claude/", ".codex/",
+        "infra/", "gradle/", "scripts/",
+        "examples/demo-", "docs/images",
+    )):
+        return True
+    # Bare gradle / kts / source-build files typed without ../../.
+    if "/" not in path and path.endswith((
+        ".kts", ".gradle", ".sbt", ".mill", ".properties",
+        ".sh", ".bat", ".ps1",
+        ".conf", ".ini", ".cfg",
+        ".env",
+    )):
+        return True
+    if path.endswith((
+        "gradlew", "gradlew.bat", "CODEOWNERS",
+    )):
+        return True
+    # Bare .txt / .json / .yaml / .md / .html siblings seen in session
+    # transcripts (e.g. "01 Summary.txt") — the session body inlined
+    # filenames.  Only strip bare filenames without any directory;
+    # path-prefixed refs might still be legit.
+    if "/" not in path and base.endswith((
+        ".txt", ".json", ".csv", ".yaml", ".yml", ".md", ".html",
+    )):
+        return True
+    return False
+
+
+def strip_dead_session_refs(html_body: str) -> str:
+    """Unwrap anchors that point at session-local dead refs (#336).
+
+    Replaces ``<a href="tasks.md" ...>TASKS</a>`` with
+    ``<span class="session-ref dead-link">TASKS</span>``.  The text
+    stays visible (users still see the filename that was referenced)
+    but the link is gone, so the compiled site stops reporting a 404.
+    """
+    # Lazy import to avoid a hard markdown dep at module import time.
+    import re as _re
+
+    # Match anchors we'd otherwise route.  Skip anchors already rewritten
+    # to absolute URLs (github.com / external).
+    anchor_re = _re.compile(
+        r'<a\s+([^>]*?)href="([^"]+)"([^>]*)>(.*?)</a>',
+        _re.IGNORECASE | _re.DOTALL,
+    )
+
+    def _sub(m: _re.Match) -> str:
+        pre, href, post, inner = m.group(1), m.group(2), m.group(3), m.group(4)
+        # Respect absolute + mailto + in-page anchors — they're never dead.
+        if href.startswith(("http:", "https:", "mailto:", "#")):
+            return m.group(0)
+        if not _is_session_local_ref(href):
+            return m.group(0)
+        # Preserve the inner text; drop the anchor.  Add title attribute
+        # so hover reveals what the original href was.
+        import html as _html
+        title = _html.escape(href)
+        return (
+            f'<span class="session-ref dead-link" title="session-local ref: {title}">'
+            f'{inner}</span>'
+        )
+
+    return anchor_re.sub(_sub, html_body)
 
 
 def rewrite_source_code_links_to_github(html_body: str) -> str:

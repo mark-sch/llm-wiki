@@ -106,7 +106,11 @@ def check_site(site_dir: Path) -> dict[str, Any]:
         "external_skipped": external_skipped,
         "internal_checked": total_links - external_skipped,
         "broken_count": len(broken),
-        "broken": broken[:100],
+        # #336: expose all broken entries (capped list was misleading —
+        # hid the reduction when a fix dropped the head but tail
+        # reshuffled).  ``broken_count`` has always been exact; now
+        # ``broken`` matches it instead of silently truncating at 100.
+        "broken": broken,
     }
 
 

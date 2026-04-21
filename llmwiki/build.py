@@ -630,8 +630,24 @@ def render_session(
     # during the session (tasks.md, CLAUDE.md, convert.py, etc). Route
     # the ones that look like repo source code or root files to GitHub
     # so the links don't dead-end after ingest.
-    from llmwiki.docs_pages import rewrite_source_code_links_to_github
+    from llmwiki.docs_pages import (
+        rewrite_md_links_to_html,
+        rewrite_source_code_links_to_github,
+        strip_dead_session_refs,
+    )
     body_html = rewrite_source_code_links_to_github(body_html)
+    # #284: now that README.md and CONTRIBUTING.md compile to
+    # site/README.html / site/CONTRIBUTING.html, session bodies that
+    # reference those files should route to the compiled pages.
+    # Generic .md → .html pass runs AFTER the GitHub rewrite so
+    # source-code and repo-root-only refs (CLAUDE.md, AGENTS.md) still
+    # go to GitHub.
+    body_html = rewrite_md_links_to_html(body_html)
+    # #336: for remaining session-local refs (tasks.md, user_profile.md,
+    # wiki/sources/<proj>/... wikilinks), drop the anchor but keep the
+    # text — they point at files unique to the user's project and don't
+    # compile to anywhere on the site.
+    body_html = strip_dead_session_refs(body_html)
     raw_md_for_copy = html.escape(body)
     reading_min = calc_reading_time(body)
 
@@ -1166,6 +1182,87 @@ def render_index(
     return out_path
 
 
+def _render_root_md_page(
+    src_name: str,
+    out_name: str,
+    title: str,
+    subtitle: str,
+    meta_description: str,
+    out_dir: Path,
+    *,
+    active_nav: str = "docs",
+) -> Optional[Path]:
+    """Compile a repo-root ``.md`` file to a standalone site page (#284).
+
+    Used for ``README.md`` and ``CONTRIBUTING.md`` so visitors don't get
+    bounced out to GitHub for content we're already shipping as HTML.
+    """
+    src = REPO_ROOT / src_name
+    if not src.is_file():
+        return None
+    raw = src.read_text(encoding="utf-8")
+    body_md = raw
+    lines = raw.splitlines()
+    if lines and lines[0].lstrip().startswith("# "):
+        body_md = "\n".join(lines[1:]).lstrip("\n")
+    content_html = md_to_html(body_md)
+    # #270: route embedded source-code + repo-root links to GitHub, then
+    # the generic .md→.html pass for anything remaining.  README has
+    # plenty of such links.
+    from llmwiki.docs_pages import (
+        rewrite_md_links_to_html,
+        rewrite_source_code_links_to_github,
+    )
+    content_html = rewrite_source_code_links_to_github(content_html)
+    content_html = rewrite_md_links_to_html(content_html)
+
+    body = f"""<section class="section docs-body">
+  <div class="container narrow">
+    <article class="article docs-article">
+      {content_html}
+    </article>
+  </div>
+</section>
+</main>
+"""
+    page = (
+        page_head(
+            f"{title} — LLM Wiki",
+            meta_description,
+            css_prefix="",
+        )
+        + nav_bar(active_nav, link_prefix="")
+        + hero(title, subtitle)
+        + body
+        + page_foot(js_prefix="")
+    )
+    out_path = out_dir / out_name
+    out_path.write_text(page, encoding="utf-8")
+    return out_path
+
+
+def render_readme_page(out_dir: Path) -> Optional[Path]:
+    """Compile ``README.md`` to ``site/README.html`` (#284)."""
+    return _render_root_md_page(
+        "README.md", "README.html",
+        title="README",
+        subtitle="The public README of llmwiki, rendered from `README.md`.",
+        meta_description="llmwiki — Karpathy-style LLM wiki from your Claude Code, Codex CLI, Cursor, and Obsidian sessions.",
+        out_dir=out_dir,
+    )
+
+
+def render_contributing_page(out_dir: Path) -> Optional[Path]:
+    """Compile ``CONTRIBUTING.md`` to ``site/CONTRIBUTING.html`` (#284)."""
+    return _render_root_md_page(
+        "CONTRIBUTING.md", "CONTRIBUTING.html",
+        title="Contributing",
+        subtitle="The 8 rules + review bar for contributing to llmwiki.",
+        meta_description="Contribution rules, PR checklist, and review bar for llmwiki.",
+        out_dir=out_dir,
+    )
+
+
 # ─── changelog page ────────────────────────────────────────────────────────
 
 def render_changelog(out_dir: Path) -> Optional[Path]:
@@ -1674,6 +1771,11 @@ def build_site(
     render_sessions_index(sources, groups, out_dir)
     render_index(groups, sources, out_dir, synthesis=synthesis)
     cl_path = render_changelog(out_dir)
+    # #284: compile README + CONTRIBUTING as standalone site pages so
+    # they don't bounce visitors out to GitHub for content we're already
+    # shipping as HTML.
+    readme_path = render_readme_page(out_dir)
+    contributing_path = render_contributing_page(out_dir)
     # v0.7 (#55): models section — sortable index + per-model detail pages.
     models_index_path, model_count = render_models_section(out_dir)
     # v0.7 (#58): auto-generated vs-comparison pages + index.

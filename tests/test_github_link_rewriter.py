@@ -43,10 +43,7 @@ _GH = "https://github.com/Pratiyush/llm-wiki/blob/master"
     ("pyproject.toml", f"{_GH}/pyproject.toml"),
     ("config.yml", f"{_GH}/config.yml"),
     ("data.json", f"{_GH}/data.json"),
-    # Repo-root .md
-    ("README.md", f"{_GH}/README.md"),
-    ("../README.md", f"{_GH}/README.md"),
-    ("CONTRIBUTING.md", f"{_GH}/CONTRIBUTING.md"),
+    # Repo-root .md that still route to GitHub (not compiled to site HTML)
     ("CLAUDE.md", f"{_GH}/CLAUDE.md"),
     ("AGENTS.md", f"{_GH}/AGENTS.md"),
     ("CODE_OF_CONDUCT.md", f"{_GH}/CODE_OF_CONDUCT.md"),
@@ -54,10 +51,8 @@ _GH = "https://github.com/Pratiyush/llm-wiki/blob/master"
     # LICENSE + .gitignore
     ("LICENSE", f"{_GH}/LICENSE"),
     (".gitignore", f"{_GH}/.gitignore"),
-    # Previously rewritten .html versions
+    # Previously rewritten .html versions of non-compiled root files
     ("../CLAUDE.html", f"{_GH}/CLAUDE.md"),
-    ("../../CONTRIBUTING.html", f"{_GH}/CONTRIBUTING.md"),
-    ("README.html", f"{_GH}/README.md"),
 ])
 def test_rewrite_one_to_github_matches(href, expected):
     assert _rewrite_one_to_github(href) == expected
@@ -89,9 +84,20 @@ def test_rewrites_source_code_ref_in_href():
 
 
 def test_rewrites_repo_root_md():
+    # CLAUDE.md is still GitHub-routed — it's not compiled to site HTML.
+    html = 'Read the <a href="../../CLAUDE.md">CLAUDE.md</a>.'
+    out = rewrite_source_code_links_to_github(html)
+    assert f'href="{_GH}/CLAUDE.md"' in out
+
+
+def test_readme_md_left_for_md_to_html_pass_since_it_compiles_to_site():
+    """#284: README.md now compiles to site/README.html so the github
+    rewriter leaves it alone — the generic .md→.html pass converts it
+    to README.html, pointing at the compiled page."""
     html = 'Read the <a href="../../README.md">README</a>.'
     out = rewrite_source_code_links_to_github(html)
-    assert f'href="{_GH}/README.md"' in out
+    assert 'github.com' not in out
+    assert 'href="../../README.md"' in out
 
 
 def test_rewrites_previously_rewritten_claude_html():
@@ -128,21 +134,22 @@ def test_leaves_docs_md_alone():
 
 def test_multiple_rewrites_in_one_body():
     html = (
-        'Read <a href="../../README.md">README</a> and '
+        'Read <a href="../../CLAUDE.md">CLAUDE</a> and '
         '<a href="../../llmwiki/convert.py">convert</a> and '
         '<a href="docs/reference/cli.md">CLI ref</a>.'
     )
     out = rewrite_source_code_links_to_github(html)
-    assert out.count(_GH) == 2  # README + convert.py
+    assert out.count(_GH) == 2  # CLAUDE + convert.py
     assert 'href="docs/reference/cli.md"' in out  # regular doc left alone
 
 
 def test_preserves_html_attributes_on_anchor():
-    html = '<a href="../README.md" class="x" data-id="1">r</a>'
+    # CLAUDE.md is still routed to GitHub; use it for this test.
+    html = '<a href="../CLAUDE.md" class="x" data-id="1">c</a>'
     out = rewrite_source_code_links_to_github(html)
     assert 'class="x"' in out
     assert 'data-id="1"' in out
-    assert f'href="{_GH}/README.md"' in out
+    assert f'href="{_GH}/CLAUDE.md"' in out
 
 
 def test_python_link_under_subdir():
