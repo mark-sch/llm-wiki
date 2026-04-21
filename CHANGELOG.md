@@ -8,6 +8,14 @@ Versions below 1.0 are pre-production — API and file formats may change.
 
 ## [Unreleased]
 
+## [1.1.0-rc7] — 2026-04-21
+
+rc7 batch.  Closes 4 issues: #351 (AI auto-tags), #348/#350/#353 (recurring broken-link reports).
+
+### Fixed
+
+- **Recurring broken-link reports** (#348, #350, #353) — the `lychee` workflow kept opening the same "Broken external links detected" issue every Sunday because two URLs always failed on CI runners: (a) `https://github.com/Pratiyush/llm-wiki/settings/environments` is auth-gated (admin only), and (b) `docs/index.md` pointed at `../changelog.html` which only exists inside the compiled `site/`, not at repo root where lychee resolves relative links.  Fix: added `^https://github\.com/Pratiyush/llm-wiki/settings` to `lychee.toml`'s exclude list, and repointed the `docs/index.md` changelog link at the canonical `CHANGELOG.md` on master (stopped bitrotting the "latest release" text too — was frozen at rc2, now rc6).
+
 ### Added
 
 - **Automatic AI-suggested tags during synthesis** (#351) — before rc6 every wiki source page shipped with a deterministic-only tag list (`[<adapter>, session-transcript, <project>, <model-family>]`).  Readers got no *topical* signal — a session about prompt caching looked the same as a session about SQLite FTS.  Now the synthesizer's own call (Anthropic API in API mode, Ollama in Agent mode) emits a `<!-- suggested-tags: prompt-caching, anthropic-api, token-budget -->` block as the first line of its response, which `_extract_suggested_tags` parses and strips before the body hits disk.  `_merge_tags` then folds those topical tags into the deterministic baseline with (a) maintainer-curated tags preserved first (re-synthesize never overwrites hand edits), (b) stop-word filter so the LLM can't re-add `claude-code` / `session` / `summary`, (c) hard cap of 5 AI tags per page, (d) near-duplicate rejection at threshold 0.80 + prefix-containment check so `prompt-cache` gets blocked when `prompt-caching` already exists.  Zero extra API round-trips — rides the existing synthesis call.  22 new tests in `tests/test_ai_suggested_tags.py` cover parsing, merging, de-dup, stop-words, caps, re-synthesize preservation, and malformed-input graceful fallback.

@@ -113,5 +113,5 @@ out of the way. The only third-party runtime dependency is `markdown`.
 
 ## What's new
 
-See the **[changelog](../changelog.html)**. Latest tagged release:
-[v1.1.0-rc2](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc2).
+See the **[CHANGELOG](https://github.com/Pratiyush/llm-wiki/blob/master/CHANGELOG.md)**. Latest tagged release:
+[v1.1.0-rc6](https://github.com/Pratiyush/llm-wiki/releases/tag/v1.1.0-rc6).
