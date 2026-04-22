@@ -222,20 +222,28 @@ def test_synthesize_force_resynthesizes(tmp_path: Path):
     assert s2["synthesized"] == 1
 
 
-def test_synthesize_dry_run_doesnt_write(tmp_path: Path):
+def test_synthesize_skip_already_processed(tmp_path: Path):
+    """After synthesizing once, a second run skips the same session."""
     raw = _seed_raw(tmp_path)
     wiki_sources = tmp_path / "wiki" / "sources"
     wiki_sources.mkdir(parents=True)
+    log_file = tmp_path / "wiki" / "log.md"
+    log_file.write_text("# Log\n", encoding="utf-8")
 
-    summary = synthesize_new_sessions(
+    # First run — synthesizes
+    s1 = synthesize_new_sessions(
         backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
-        dry_run=True,
+        log_path=log_file,
     )
-    assert summary["new_files"] == 1
-    assert summary["synthesized"] == 0
-    assert summary["skipped"] == 1
-    # No output file created
-    assert not (wiki_sources / "test-proj" / "test-synth.md").exists()
+    assert s1["synthesized"] == 1
+
+    # Second run — skips (already done, mtime unchanged)
+    s2 = synthesize_new_sessions(
+        backend=DummySynthesizer(), raw_dir=raw, wiki_sources_dir=wiki_sources,
+        log_path=log_file,
+    )
+    assert s2["new_files"] == 0
+    assert s2["synthesized"] == 0
 
 
 def test_synthesize_unavailable_backend(tmp_path: Path):

@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from llmwiki.adapters.opencode import OpenCodeAdapter
+from llmwiki.adapters.contrib.opencode import OpenCodeAdapter
 
 
 # ─── Adapter registration ─────────────────────────────────────────────
 
 
 def test_adapter_registered():
-    from llmwiki.adapters import REGISTRY, discover_adapters
-    discover_adapters()
+    from llmwiki.adapters import REGISTRY, discover_all
+    discover_all()
     assert "opencode" in REGISTRY
 
 

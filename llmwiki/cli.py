@@ -8,11 +8,12 @@ Subcommands:
     sync              Convert new .jsonl sessions to markdown
     build             Compile static HTML site from raw/ + wiki/
     serve             Start local HTTP server
-    graph             Build the knowledge graph (graph/graph.json + graph.html)
-    watch             Watch agent session stores and auto-sync on change
-    export-obsidian   Export the compiled wiki into an Obsidian vault
-    export-qmd        Export the wiki as a self-contained qmd collection
     adapters          List available session-store adapters
+    graph             Build the knowledge graph (graph/graph.json + graph.html)
+    export            Export AI-consumable formats (llms-txt, jsonld, sitemap, ...)
+    lint              Run lint rules against the wiki
+    candidates        List / promote / merge / discard candidate pages
+    synthesize        Synthesize wiki source pages from raw sessions via LLM
     version           Print version and exit
 """
 
@@ -105,31 +106,11 @@ def cmd_sync(args: argparse.Namespace) -> int:
         project=args.project,
         include_current=args.include_current,
         force=args.force,
-        dry_run=args.dry_run,
     )
-    # v0.7 (#96): optionally download remote images after conversion.
-    if args.download_images:
-        from llmwiki.image_pipeline import process_markdown_images
-        from llmwiki import REPO_ROOT
-        raw_sessions = REPO_ROOT / "raw" / "sessions"
-        assets_dir = REPO_ROOT / "raw" / "assets"
-        total_dl = total_fail = total_skip = 0
-        if raw_sessions.exists():
-            for md_file in sorted(raw_sessions.rglob("*.md")):
-                dl, fail, skip = process_markdown_images(
-                    md_file, assets_dir, dry_run=args.dry_run,
-                )
-                total_dl += dl
-                total_fail += fail
-                total_skip += skip
-        print(
-            f"  images: {total_dl} downloaded, {total_fail} failed, "
-            f"{total_skip} skipped (cached)"
-        )
 
     # v1.0 (#157): auto-build and auto-lint after sync.
     # --no-build and --no-lint let users opt out.
-    if rc == 0 and not args.dry_run:
+    if rc == 0:
         schedule = _load_schedule_config()
         if args.auto_build and _should_run_after_sync(schedule.get("build", "on-sync")):
             print("  auto-build: regenerating site/...")
@@ -316,244 +297,35 @@ def cmd_adapters(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_query(args: argparse.Namespace) -> int:
+    """Query the knowledge graph with a natural language question."""
+    from llmwiki.graphify_bridge import is_available, query_graph
+    if not is_available():
+        print("error: graphifyy not installed. Run: pip install llmwiki[graph]", file=sys.stderr)
+        return 2
+    question = " ".join(args.question)
+    result = query_graph(question, depth=args.depth, token_budget=args.budget)
+    print(result)
+    return 0
+
+
 def cmd_graph(args: argparse.Namespace) -> int:
     """Build the knowledge graph from wiki/ wikilinks."""
+    engine = getattr(args, "engine", "graphify")
+    if engine == "graphify":
+        from llmwiki.graphify_bridge import is_available, build_graphify_graph
+        if not is_available():
+            print("  graphifyy not installed — falling back to builtin engine", file=sys.stderr)
+            print("  install with: pip install llmwiki[graph]", file=sys.stderr)
+            engine = "builtin"
+        else:
+            result = build_graphify_graph()
+            return 0 if result.get("graph") is not None else 1
+
     from llmwiki.graph import build_and_report
     write_json = args.format in ("json", "both")
     write_html = args.format in ("html", "both")
     return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
-
-
-def cmd_backlinks(args: argparse.Namespace) -> int:
-    """Inject managed ``## Referenced by`` sections into every
-    wiki page that something else links to (#328).
-
-    Builds the reverse-reference index and rewrites each target page's
-    sentinel-bounded backlinks block.  Idempotent: rerun flips the
-    content but leaves the rest of the page untouched.  Pair with
-    ``--dry-run`` to preview.  Use ``--prune`` to strip every block
-    back out.
-    """
-    from llmwiki import backlinks as _b
-
-    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
-    if not wiki_dir.is_dir():
-        print(f"error: wiki directory not found: {wiki_dir}", file=sys.stderr)
-        return 2
-
-    if args.prune:
-        n = _b.prune_all(wiki_dir, dry_run=args.dry_run)
-        prefix = "[dry-run] " if args.dry_run else ""
-        print(f"{prefix}removed backlink blocks from {n} page(s)")
-        return 0
-
-    results = _b.inject_all(
-        wiki_dir,
-        max_entries=args.max_entries,
-        dry_run=args.dry_run,
-    )
-    prefix = "[dry-run] " if args.dry_run else ""
-    total_backlinks = sum(results.values())
-    print(
-        f"{prefix}wrote backlink blocks to {len(results)} page(s); "
-        f"{total_backlinks} total inbound reference(s)."
-    )
-    if args.verbose:
-        print()
-        for slug, n in sorted(results.items(), key=lambda x: -x[1])[:20]:
-            print(f"  {slug}: {n} referrer(s)")
-    return 0
-
-
-def cmd_references(args: argparse.Namespace) -> int:
-    """Enumerate every page linking to ``<entity>`` (G-17 · #303).
-
-    Output sorted by source path (so diffs are stable).  Pair with
-    ``llmwiki lint --rule stale_reference_detection`` to surface the
-    *stale* ones.
-    """
-    from llmwiki.lint import load_pages
-    from llmwiki import references as _refs
-
-    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
-    if not wiki_dir.is_dir():
-        print(f"error: wiki directory not found: {wiki_dir}", file=sys.stderr)
-        return 2
-
-    pages = load_pages(wiki_dir)
-    hits = _refs.find_references_to(args.entity, pages)
-    print(_refs.format_references_table(hits))
-
-    if hits and args.with_dated_claims:
-        print()
-        claim_refs = [r for r in hits if r.dated_claims]
-        if claim_refs:
-            print(f"{len(claim_refs)} referrer(s) have dated claims:")
-            for r in claim_refs:
-                print(f"  {r.source}:")
-                for claim in r.dated_claims:
-                    excerpt = claim if len(claim) < 120 else claim[:117] + "..."
-                    print(f"    • {excerpt}")
-    return 0
-
-
-def cmd_tag(args: argparse.Namespace) -> int:
-    """Tag-space curation (G-15 · #301).
-
-    Subcommands:
-      list                   — every tag + usage count
-      add <tag> <page>       — append to a page's frontmatter
-      rename <old> <new>     — rewrite across every page (supports --dry-run)
-      check                  — flag near-duplicate tags
-      convention             — G-16: topics-vs-tags misuse
-    """
-    from llmwiki import tags as _tags
-
-    action = getattr(args, "action", None) or "list"
-    wiki_dir = getattr(args, "wiki_dir", None) or (REPO_ROOT / "wiki")
-
-    entries = _tags.collect_tags(wiki_dir)
-
-    if action == "list":
-        counts = _tags.count_tags(entries)
-        print(_tags.format_tag_table(counts))
-        if counts:
-            print()
-            print(f"Total: {len(counts)} unique tag(s), {sum(counts.values())} occurrence(s)")
-        return 0
-
-    if action == "add":
-        if not args.tag or not args.page:
-            print("error: tag and page are required", file=sys.stderr)
-            return 2
-        try:
-            changed = _tags.add_tag_to_page(
-                args.tag, Path(args.page), field=args.field
-            )
-        except (FileNotFoundError, ValueError) as e:
-            print(f"error: {e}", file=sys.stderr)
-            return 2
-        if changed:
-            print(f"Added tag {args.tag!r} to {args.page}")
-        else:
-            print(f"Tag {args.tag!r} already present on {args.page}")
-        return 0
-
-    if action == "rename":
-        if not args.old or not args.new:
-            print("error: old and new tags are required", file=sys.stderr)
-            return 2
-        try:
-            touched = _tags.rename_tag(
-                args.old, args.new,
-                wiki_dir=wiki_dir,
-                dry_run=args.dry_run,
-            )
-        except ValueError as e:
-            print(f"error: {e}", file=sys.stderr)
-            return 2
-        total = sum(touched.values())
-        prefix = "[dry-run] " if args.dry_run else ""
-        if total == 0:
-            print(f"{prefix}No occurrences of {args.old!r} found.")
-        else:
-            print(
-                f"{prefix}Rewrote {args.old!r} → {args.new!r} in "
-                f"{len(touched)} page(s), {total} occurrence(s)."
-            )
-            for p, n in sorted(touched.items()):
-                rel = p.relative_to(wiki_dir.parent) if wiki_dir.parent in p.parents else p
-                print(f"  {rel}  ({n})")
-        return 0
-
-    if action == "check":
-        near = _tags.near_duplicate_tags(entries, threshold=args.threshold)
-        if not near:
-            print("No near-duplicate tags found.")
-            return 0
-        print(f"Found {len(near)} near-duplicate pair(s) (threshold {args.threshold}):")
-        for a, b, ratio in near:
-            print(f"  {a!r}  ~  {b!r}  ({ratio:.2f})")
-        return 0
-
-    if action == "convention":
-        viols = _tags.convention_violations(entries)
-        if not viols:
-            print("No convention violations (G-16 · #302).")
-            return 0
-        print(
-            f"Found {len(viols)} convention violation(s): "
-            "sources/entities/concepts should use `tags:`, projects should use `topics:`."
-        )
-        for page, expected, actual in viols:
-            rel = page.relative_to(wiki_dir.parent) if wiki_dir.parent in page.parents else page
-            print(f"  {rel}: uses `{actual}:` but should use `{expected}:`")
-        return 0
-
-    print(f"error: unknown tag action {action!r}", file=sys.stderr)
-    return 2
-
-
-def cmd_log(args: argparse.Namespace) -> int:
-    """Query ``wiki/log.md`` structurally (G-13 · #299).
-
-    Examples::
-
-        llmwiki log                                 # last 10 of any op
-        llmwiki log --since 2026-04-01
-        llmwiki log --operation sync,synthesize
-        llmwiki log --limit 50
-        llmwiki log --format json
-    """
-    import json as _json
-    from datetime import date as _date
-
-    from llmwiki.log_reader import parse_log, recent_events
-
-    log_path = REPO_ROOT / "wiki" / "log.md"
-    if not log_path.is_file():
-        print(f"no log at {log_path.relative_to(REPO_ROOT)}", file=sys.stderr)
-        return 1
-
-    ops: Optional[set[str]] = None
-    if args.operation:
-        ops = {o.strip().lower() for o in args.operation.split(",") if o.strip()}
-
-    events = recent_events(log_path, limit=max(args.limit, 0) or 10**9, operations=ops)
-
-    if args.since:
-        try:
-            cutoff = _date.fromisoformat(args.since)
-        except ValueError:
-            print(f"error: --since must be YYYY-MM-DD, got {args.since!r}", file=sys.stderr)
-            return 2
-        events = [e for e in events if e.date >= cutoff]
-
-    if args.limit > 0:
-        events = events[: args.limit]
-
-    if args.format == "json":
-        print(_json.dumps([
-            {
-                "date": e.date.isoformat(),
-                "operation": e.operation,
-                "title": e.title,
-                "details": e.details,
-            }
-            for e in events
-        ], indent=2))
-        return 0
-
-    if not events:
-        print("No log entries match the filters.")
-        return 0
-
-    # Human-readable output.
-    for e in events:
-        print(f"[{e.date.isoformat()}] {e.operation:<12}  {e.title}")
-        for key, value in e.details.items():
-            print(f"    {key}: {value}")
-    return 0
 
 
 def cmd_sync_status(args: argparse.Namespace) -> int:
@@ -656,138 +428,6 @@ def _resolve_key_exists(key: str) -> bool:
     return candidate.exists() or _Path(rel).exists()
 
 
-def cmd_quarantine(args: argparse.Namespace) -> int:
-    """Inspect / clear the convert-error quarantine (G-14 · #300)."""
-    from llmwiki import quarantine as q
-
-    action = getattr(args, "action", None) or "list"
-
-    if action == "list":
-        entries = q.list_entries(adapter=args.adapter)
-        print(q.format_table(entries))
-        if entries and not args.adapter:
-            counts = q.count_by_adapter()
-            print()
-            print(f"Total quarantined: {sum(counts.values())} across {len(counts)} adapter(s)")
-        return 0
-
-    if action == "clear":
-        if args.all:
-            removed = q.clear_all()
-            print(f"Cleared {removed} quarantine entr{'y' if removed == 1 else 'ies'}.")
-            return 0
-        if not args.source:
-            print("error: pass --all or a source path to clear", file=sys.stderr)
-            return 2
-        removed = q.clear_entry(args.source, adapter=args.adapter)
-        print(f"Cleared {removed} quarantine entr{'y' if removed == 1 else 'ies'} for {args.source}")
-        return 0
-
-    if action == "retry":
-        entries = q.list_entries(adapter=args.adapter)
-        if not entries:
-            print("No quarantined sources to retry.")
-            return 0
-        print(
-            f"Retry plan — {len(entries)} source(s).  Clear the quarantine and re-run sync to retry:"
-        )
-        print()
-        print(q.format_table(entries))
-        print()
-        print("Once your converter fix is in place:")
-        print("  llmwiki quarantine clear --all")
-        print("  llmwiki sync")
-        return 0
-
-    print(f"error: unknown quarantine action {action!r}", file=sys.stderr)
-    return 2
-
-
-def cmd_watch(args: argparse.Namespace) -> int:
-    """Watch agent session stores and auto-sync on change."""
-    from llmwiki.watch import watch as run_watch
-    return run_watch(
-        adapters=args.adapter,
-        interval=args.interval,
-        debounce=args.debounce,
-        dry_run=args.dry_run,
-    )
-
-
-def cmd_export_obsidian(args: argparse.Namespace) -> int:
-    """Export the compiled wiki into an Obsidian vault."""
-    from llmwiki.obsidian_output import export_to_vault
-    return export_to_vault(
-        vault=args.vault,
-        subfolder=args.subfolder,
-        dry_run=args.dry_run,
-        clean=args.clean,
-    )
-
-
-def cmd_eval(args: argparse.Namespace) -> int:
-    """Run the structural eval battery over wiki/."""
-    from llmwiki.eval import main as eval_main
-    sub_argv: list[str] = []
-    if args.check:
-        sub_argv.extend(["--check"] + args.check)
-    if args.json:
-        sub_argv.append("--json")
-    if args.out:
-        sub_argv.extend(["--out", str(args.out)])
-    if args.fail_below:
-        sub_argv.extend(["--fail-below", str(args.fail_below)])
-    return eval_main(sub_argv)
-
-
-def cmd_export_marp(args: argparse.Namespace) -> int:
-    """Export a Marp slide deck from wiki content matching a topic (v0.7 · #95)."""
-    from llmwiki.export_marp import export_marp
-    from llmwiki import REPO_ROOT
-
-    wiki_dir = args.wiki or (REPO_ROOT / "wiki")
-    out_path = args.out
-    result = export_marp(topic=args.topic, wiki_dir=wiki_dir, out_path=out_path)
-    if result:
-        print(f"==> Marp deck written to {result}")
-    else:
-        print("  no matching pages found for the topic")
-    return 0
-
-
-def cmd_check_links(args: argparse.Namespace) -> int:
-    """Verify every internal link in site/ resolves to an existing file."""
-    from llmwiki.link_checker import main as link_main
-    sub_argv: list[str] = []
-    if args.site_dir:
-        sub_argv.extend(["--site-dir", str(args.site_dir)])
-    if args.fail_on_broken:
-        sub_argv.append("--fail-on-broken")
-    if args.limit:
-        sub_argv.extend(["--limit", str(args.limit)])
-    return link_main(sub_argv)
-
-
-def cmd_export_qmd(args: argparse.Namespace) -> int:
-    """Export the wiki as a self-contained qmd collection (v0.6 · #59)."""
-    from llmwiki.export_qmd import export_qmd
-
-    out_dir = args.out
-    source_wiki = args.source_wiki or (REPO_ROOT / "wiki")
-    summary = export_qmd(
-        out_dir=out_dir,
-        source_wiki=source_wiki,
-        collection_name=args.collection,
-    )
-    print(
-        f"==> qmd export complete: "
-        f"{summary['files_copied']} files copied into {summary['out_dir']} "
-        f"(collection: {summary['collection']})"
-    )
-    print(f"    next: cd {summary['out_dir']} && ./index.sh")
-    return 0
-
-
 def cmd_export(args: argparse.Namespace) -> int:
     """Export AI-consumable formats from the compiled wiki."""
     import sys as _sys
@@ -799,6 +439,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         write_rss,
         write_robots_txt,
         write_ai_readme,
+        write_marp,
         export_all,
     )
     from llmwiki.build import discover_sources, group_by_project, RAW_SESSIONS
@@ -819,6 +460,7 @@ def cmd_export(args: argparse.Namespace) -> int:
             print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
         return 0
 
+    topic = getattr(args, "topic", "") or ""
     mapping = {
         "llms-txt": lambda: write_llms_txt(out_dir, groups, len(sources)),
         "llms-full-txt": lambda: write_llms_full_txt(out_dir, sources),
@@ -827,6 +469,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         "rss": lambda: write_rss(out_dir, sources),
         "robots": lambda: write_robots_txt(out_dir),
         "ai-readme": lambda: write_ai_readme(out_dir, groups, len(sources)),
+        "marp": lambda: write_marp(out_dir, sources, topic=topic),
     }
     fn = mapping.get(format_)
     if not fn:
@@ -834,30 +477,6 @@ def cmd_export(args: argparse.Namespace) -> int:
         return 2
     p = fn()
     print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
-    return 0
-
-
-def cmd_manifest(args: argparse.Namespace) -> int:
-    """Build a site/manifest.json with SHA-256 hashes + perf budget check."""
-    from llmwiki.manifest import write_manifest
-    site_dir = args.site_dir or (REPO_ROOT / "site")
-    if not site_dir.exists():
-        print(f"error: {site_dir} does not exist. Run 'llmwiki build' first.", file=sys.stderr)
-        return 2
-    p = write_manifest(site_dir)
-    print(f"  wrote {p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p}")
-    # Read back and show budget status
-    import json as _json
-    report = _json.loads(p.read_text(encoding="utf-8"))
-    print(f"  {report['total_files']} files, {report['total_bytes'] / 1024 / 1024:.1f} MB")
-    if report.get("budget_violations"):
-        print("  ⚠ budget violations:")
-        for v in report["budget_violations"]:
-            print(f"    {v}")
-        if args.fail_on_violations:
-            return 1
-    else:
-        print("  ✓ all perf budget targets met")
     return 0
 
 
@@ -962,7 +581,6 @@ def cmd_synthesize(args: argparse.Namespace) -> int:
 
     summary = synthesize_new_sessions(
         backend=backend,
-        dry_run=args.dry_run,
         force=args.force,
     )
     print(
@@ -1275,114 +893,6 @@ def cmd_candidates(args: argparse.Namespace) -> int:
     return 2
 
 
-def cmd_completion(args: argparse.Namespace) -> int:
-    """Emit shell completion script for the requested shell (v1.1.0 · #216)."""
-    from llmwiki.completion import generate
-    try:
-        script = generate(args.shell)
-    except ValueError as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 2
-    print(script)
-    return 0
-
-
-def cmd_schedule(args: argparse.Namespace) -> int:
-    """Generate scheduled sync task files for the current platform (v1.0 · #162)."""
-    import json as _json
-    from llmwiki.scheduled_sync import (
-        detect_platform,
-        generate,
-        install_instructions,
-    )
-
-    target_platform = args.platform or detect_platform()
-    if target_platform == "unknown":
-        print("error: could not detect platform. Pass --platform macos|linux|windows", file=sys.stderr)
-        return 2
-
-    config_path = REPO_ROOT / "examples" / "sessions_config.json"
-    config: dict = {}
-    if config_path.is_file():
-        try:
-            config = _json.loads(config_path.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            pass
-
-    outputs = generate(target_platform, config)
-    if not outputs:
-        print(f"error: unsupported platform {target_platform!r}", file=sys.stderr)
-        return 2
-
-    out_dir = args.out or REPO_ROOT / "build" / "scheduled-sync"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for name, content in outputs.items():
-        path = out_dir / name
-        path.write_text(content, encoding="utf-8")
-        print(f"  wrote {path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path}")
-
-    print()
-    print(install_instructions(target_platform))
-    return 0
-
-
-def cmd_install_skills(args: argparse.Namespace) -> int:
-    """Install llmwiki skills into multi-agent directories (v1.0 · #160)."""
-    from llmwiki.skill_installer import install_all, list_installed
-
-    count = install_all()
-    print(f"  installed {count} skill/target combinations")
-    print()
-    print("Skills installed per target:")
-    for target, skills in list_installed().items():
-        p = Path(target)
-        rel = p.relative_to(REPO_ROOT) if p.is_relative_to(REPO_ROOT) else p
-        print(f"  {rel}/  ({len(skills)} skills)")
-        for s in skills:
-            print(f"    - {s}")
-    return 0
-
-
-def cmd_link_obsidian(args: argparse.Namespace) -> int:
-    """Create a symlink from an Obsidian vault to the llm-wiki project root."""
-    vault = Path(args.vault).expanduser().resolve()
-    if not vault.is_dir():
-        print(f"error: vault path does not exist: {vault}", file=sys.stderr)
-        return 2
-
-    link_path = vault / args.name
-    target = REPO_ROOT
-
-    if link_path.is_symlink():
-        existing = link_path.resolve()
-        if existing == target and not args.force:
-            print(f"  ✓ symlink already exists: {link_path} → {target}")
-            return 0
-        if args.force:
-            link_path.unlink()
-            print(f"  removed existing symlink: {link_path}")
-        else:
-            print(
-                f"error: {link_path} already exists (→ {existing}). "
-                f"Use --force to overwrite.",
-                file=sys.stderr,
-            )
-            return 1
-    elif link_path.exists():
-        print(
-            f"error: {link_path} exists and is not a symlink. "
-            f"Remove it manually first.",
-            file=sys.stderr,
-        )
-        return 1
-
-    link_path.symlink_to(target)
-    print(f"  ✓ created symlink: {link_path} → {target}")
-    print(f"  Obsidian will now show the llm-wiki project under '{args.name}/'")
-    print(f"  wiki/ pages use [[wikilinks]] which Obsidian resolves natively.")
-    return 0
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="llmwiki",
@@ -1403,11 +913,6 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--project", type=str, help="Substring filter on project slug")
     sync.add_argument("--include-current", action="store_true", help="Don't skip live sessions (<60 min)")
     sync.add_argument("--force", action="store_true", help="Ignore state file, reconvert everything")
-    sync.add_argument("--dry-run", action="store_true")
-    sync.add_argument(
-        "--download-images", action="store_true",
-        help="Download remote images in converted .md files to raw/assets/",
-    )
     sync.add_argument(
         "--auto-build", action=argparse.BooleanOptionalAction, default=True,
         help="After sync, auto-rebuild the static site if schedule allows (default: on)",
@@ -1473,195 +978,22 @@ def build_parser() -> argparse.ArgumentParser:
     # graph
     graph = sub.add_parser("graph", help="Build the knowledge graph (graph/graph.json + graph.html)")
     graph.add_argument("--format", choices=["json", "html", "both"], default="both")
+    graph.add_argument(
+        "--engine", choices=["builtin", "graphify"], default="graphify",
+        help="Graph engine: 'graphify' (AI-powered, default) or 'builtin' (stdlib wikilinks fallback)",
+    )
     graph.set_defaults(func=cmd_graph)
-
-    # quarantine (G-14 · #300)
-    quar = sub.add_parser(
-        "quarantine",
-        help="Inspect / clear the convert-error quarantine",
-    )
-    quar_sub = quar.add_subparsers(dest="action")
-    quar_list = quar_sub.add_parser("list", help="List quarantined sources")
-    quar_list.add_argument("--adapter", help="Filter by adapter name")
-    quar_clear = quar_sub.add_parser("clear", help="Clear quarantine entries")
-    quar_clear.add_argument("source", nargs="?", help="Source path to clear")
-    quar_clear.add_argument("--adapter", help="Restrict to one adapter")
-    quar_clear.add_argument("--all", action="store_true", help="Clear every entry")
-    quar_retry = quar_sub.add_parser("retry", help="Print retry plan")
-    quar_retry.add_argument("--adapter", help="Filter by adapter name")
-    quar.set_defaults(func=cmd_quarantine, action=None)
-
-    # backlinks (#328)
-    blinks = sub.add_parser(
-        "backlinks",
-        help="Inject managed `## Referenced by` blocks into every linked-to page",
-    )
-    blinks.add_argument("--wiki-dir", type=Path, default=None)
-    blinks.add_argument(
-        "--max-entries", type=int, default=50,
-        help="Max backlinks per page (default 50; truncation note added below)",
-    )
-    blinks.add_argument("--dry-run", action="store_true",
-                        help="Preview writes without touching disk")
-    blinks.add_argument("--prune", action="store_true",
-                        help="Remove every backlink block")
-    blinks.add_argument("--verbose", "-v", action="store_true",
-                        help="Print top-20 most-referenced pages after injection")
-    blinks.set_defaults(func=cmd_backlinks)
-
-    # references (G-17 · #303)
-    refs = sub.add_parser(
-        "references",
-        help="List every page linking to an entity or concept (G-17)",
-    )
-    refs.add_argument("entity", help="Slug of the target page (case-sensitive)")
-    refs.add_argument("--wiki-dir", type=Path, default=None)
-    refs.add_argument(
-        "--with-dated-claims", action="store_true",
-        help="Also print each referrer's dated claims about the target",
-    )
-    refs.set_defaults(func=cmd_references)
-
-    # tag family (G-15 · #301 + G-16 · #302)
-    tag = sub.add_parser("tag", help="Curate wiki tags (list / add / rename / check / convention)")
-    tag_sub = tag.add_subparsers(dest="action")
-    tag_list = tag_sub.add_parser("list", help="List every tag + usage count")
-    tag_list.add_argument("--wiki-dir", type=Path, default=None)
-    tag_add = tag_sub.add_parser("add", help="Add a tag to a page's frontmatter")
-    tag_add.add_argument("tag", help="Tag to add")
-    tag_add.add_argument("page", help="Target wiki page (path)")
-    tag_add.add_argument(
-        "--field", choices=["tags", "topics"], default="tags",
-        help="Frontmatter field (default: tags; use topics for projects)",
-    )
-    tag_add.add_argument("--wiki-dir", type=Path, default=None)
-    tag_rename = tag_sub.add_parser("rename", help="Rewrite a tag across every page")
-    tag_rename.add_argument("old", help="Old tag")
-    tag_rename.add_argument("new", help="New tag")
-    tag_rename.add_argument("--dry-run", action="store_true")
-    tag_rename.add_argument("--wiki-dir", type=Path, default=None)
-    tag_check = tag_sub.add_parser("check", help="Flag near-duplicate tags")
-    tag_check.add_argument(
-        "--threshold", type=float, default=0.85,
-        help="Similarity cutoff (0.0–1.0, default 0.85)",
-    )
-    tag_check.add_argument("--wiki-dir", type=Path, default=None)
-    tag_conv = tag_sub.add_parser(
-        "convention",
-        help="G-16: flag sources using `topics:` or projects using `tags:`",
-    )
-    tag_conv.add_argument("--wiki-dir", type=Path, default=None)
-    tag.set_defaults(func=cmd_tag, action=None)
-
-    # log (G-13 · #299)
-    log_p = sub.add_parser(
-        "log",
-        help="Query wiki/log.md structurally (filter by operation / date)",
-    )
-    log_p.add_argument(
-        "--since", type=str, default=None,
-        help="Keep entries on or after YYYY-MM-DD",
-    )
-    log_p.add_argument(
-        "--operation", type=str, default=None,
-        help="Comma-separated operations to keep (sync,synthesize,lint,ingest,query,build)",
-    )
-    log_p.add_argument(
-        "--limit", type=int, default=10,
-        help="Max entries to show (default 10; 0 = unlimited)",
-    )
-    log_p.add_argument(
-        "--format", choices=["text", "json"], default="text",
-        help="Output format (text for humans, json for scripts)",
-    )
-    log_p.set_defaults(func=cmd_log)
-
-    # watch
-    watch = sub.add_parser("watch", help="Watch agent session stores and auto-sync on change")
-    watch.add_argument("--adapter", nargs="*", help="Adapter(s) to watch; default: all available")
-    watch.add_argument("--interval", type=float, default=5.0, help="Polling interval seconds")
-    watch.add_argument("--debounce", type=float, default=10.0, help="Debounce window seconds")
-    watch.add_argument("--dry-run", action="store_true")
-    watch.set_defaults(func=cmd_watch)
-
-    # export-obsidian
-    exp = sub.add_parser("export-obsidian", help="Export compiled wiki into an Obsidian vault")
-    exp.add_argument("--vault", type=str, required=True, help="Path to the Obsidian vault root")
-    exp.add_argument("--subfolder", type=str, default="LLM Wiki", help="Subfolder name inside the vault")
-    exp.add_argument("--clean", action="store_true", help="Delete the target subfolder before copying")
-    exp.add_argument("--dry-run", action="store_true")
-    exp.set_defaults(func=cmd_export_obsidian)
-
-    # export-marp (v0.7, #95) — Marp slide deck generation
-    exp_marp = sub.add_parser(
-        "export-marp",
-        help="Generate a Marp slide deck from wiki content matching a topic",
-    )
-    exp_marp.add_argument(
-        "--topic", type=str, required=True,
-        help="Topic to search for in the wiki",
-    )
-    exp_marp.add_argument(
-        "--out", type=Path, default=None,
-        help="Output path (default: wiki/exports/<topic>.marp.md)",
-    )
-    exp_marp.add_argument(
-        "--wiki", type=Path, default=None,
-        help="Wiki directory (default: ./wiki)",
-    )
-    exp_marp.set_defaults(func=cmd_export_marp)
-
-    # export-qmd (v0.6, #59) — emit a self-contained qmd collection so
-    # the user can run tobi/qmd's hybrid-search stack over their wiki
-    # without llmwiki shipping a TypeScript dep.
-    exp_qmd = sub.add_parser(
-        "export-qmd",
-        help="Export the wiki as a self-contained qmd collection (tobi/qmd)",
-    )
-    exp_qmd.add_argument(
-        "--out", type=Path, required=True,
-        help="Output directory for the qmd collection",
-    )
-    exp_qmd.add_argument(
-        "--source-wiki", type=Path, default=None,
-        help="Source wiki directory (default: ./wiki)",
-    )
-    exp_qmd.add_argument(
-        "--collection", type=str, default="llmwiki",
-        help="Collection name written into qmd.yaml (default: llmwiki)",
-    )
-    exp_qmd.set_defaults(func=cmd_export_qmd)
-
-    # eval
-    ev = sub.add_parser("eval", help="Run structural eval checks over wiki/")
-    ev.add_argument("--check", nargs="*", help="Run only these named checks")
-    ev.add_argument("--json", action="store_true", help="Print JSON to stdout")
-    ev.add_argument("--out", type=Path, default=None, help="Write JSON report to this path")
-    ev.add_argument("--fail-below", type=int, default=0, help="Exit non-zero if score %% < this")
-    ev.set_defaults(func=cmd_eval)
-
-    # check-links (v0.4)
-    cl = sub.add_parser("check-links", help="Verify every internal link in site/ resolves")
-    cl.add_argument("--site-dir", type=Path, default=None)
-    cl.add_argument("--fail-on-broken", action="store_true")
-    cl.add_argument("--limit", type=int, default=20)
-    cl.set_defaults(func=cmd_check_links)
 
     # export (v0.4)
     exp2 = sub.add_parser("export", help="Export AI-consumable formats (llms-txt, jsonld, sitemap, ...)")
     exp2.add_argument(
         "format",
-        choices=["llms-txt", "llms-full-txt", "jsonld", "sitemap", "rss", "robots", "ai-readme", "all"],
+        choices=["llms-txt", "llms-full-txt", "jsonld", "sitemap", "rss", "robots", "ai-readme", "marp", "all"],
         help="Export format",
     )
     exp2.add_argument("--out", type=Path, default=None, help="Output directory (default: site/)")
+    exp2.add_argument("--topic", type=str, default="", help="Topic filter for marp slide generation")
     exp2.set_defaults(func=cmd_export)
-
-    # manifest (v0.4)
-    mf = sub.add_parser("manifest", help="Build site/manifest.json with SHA-256 hashes + perf budget check")
-    mf.add_argument("--site-dir", type=Path, default=None)
-    mf.add_argument("--fail-on-violations", action="store_true")
-    mf.set_defaults(func=cmd_manifest)
 
     # lint (v1.0, #155) — live count via the rule registry (currently 15)
     from llmwiki.lint import REGISTRY as _LINT_REG
@@ -1680,13 +1012,6 @@ def build_parser() -> argparse.ArgumentParser:
     lint.add_argument("--fail-on-errors", action="store_true",
                       help="Exit non-zero if any error-severity issues found")
     lint.set_defaults(func=cmd_lint)
-
-    # install-skills (v1.0, #160) — multi-agent skill installer
-    isk = sub.add_parser(
-        "install-skills",
-        help="Install llmwiki skills into .codex/skills/ and .agents/skills/ (multi-agent support)",
-    )
-    isk.set_defaults(func=cmd_install_skills)
 
     # candidates (v1.1, #51) — approval workflow
     cand = sub.add_parser(
@@ -1725,10 +1050,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Probe backend availability and exit (exit 0 if reachable)",
     )
     syn.add_argument(
-        "--dry-run", action="store_true",
-        help="List sessions that would be synthesized without writing",
-    )
-    syn.add_argument(
         "--force", action="store_true",
         help="Ignore state file, re-synthesize all sessions",
     )
@@ -1755,50 +1076,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     syn.set_defaults(func=cmd_synthesize)
 
-    # completion (v1.1, #216) — emit shell completion script
-    comp = sub.add_parser(
-        "completion",
-        help="Emit shell completion script (bash/zsh/fish) — pipe to the shell's completion directory",
-    )
-    comp.add_argument(
-        "shell", choices=["bash", "zsh", "fish"],
-        help="Which shell to generate completion for",
-    )
-    comp.set_defaults(func=cmd_completion)
-
-    # schedule (v1.0, #162) — generate scheduled sync task for the current OS
-    sched = sub.add_parser(
-        "schedule",
-        help="Generate OS-specific scheduled sync task files (launchd/systemd/Task Scheduler)",
-    )
-    sched.add_argument(
-        "--platform", choices=["macos", "linux", "windows"], default=None,
-        help="Target platform (default: auto-detect).",
-    )
-    sched.add_argument(
-        "--out", type=Path, default=None,
-        help="Output directory (default: build/scheduled-sync/).",
-    )
-    sched.set_defaults(func=cmd_schedule)
-
-    # link-obsidian (v1.0, Obsidian integration)
-    lo = sub.add_parser(
-        "link-obsidian",
-        help="Symlink the llm-wiki project into an Obsidian vault for native viewing",
-    )
-    lo.add_argument(
-        "--vault", type=str, required=True,
-        help="Path to the Obsidian vault root (e.g. ~/Documents/Obsidian Vault)",
-    )
-    lo.add_argument(
-        "--name", type=str, default="LLM Wiki",
-        help="Name for the symlink inside the vault (default: 'LLM Wiki')",
-    )
-    lo.add_argument(
-        "--force", action="store_true",
-        help="Overwrite existing symlink if present",
-    )
-    lo.set_defaults(func=cmd_link_obsidian)
+    # query — natural-language graph query
+    qry = sub.add_parser("query", help="Query the knowledge graph with a question")
+    qry.add_argument("question", nargs="+", help="The question to ask")
+    qry.add_argument("--depth", type=int, default=3, help="BFS traversal depth (default: 3)")
+    qry.add_argument("--budget", type=int, default=2000, help="Max output tokens (default: 2000)")
+    qry.set_defaults(func=cmd_query)
 
     # version
     ver = sub.add_parser("version", help="Print version")

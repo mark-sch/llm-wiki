@@ -7,11 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from llmwiki.adapters import REGISTRY, discover_adapters
+from llmwiki.adapters import REGISTRY, discover_all
 from llmwiki.adapters.base import BaseAdapter
-from llmwiki.adapters.cursor import CursorAdapter
-from llmwiki.adapters.gemini_cli import GeminiCliAdapter
-from llmwiki.adapters.pdf import PdfAdapter
+from llmwiki.adapters.contrib.cursor import CursorAdapter
+from llmwiki.adapters.contrib.gemini_cli import GeminiCliAdapter
 
 from tests.conftest import REPO_ROOT
 
@@ -20,30 +19,19 @@ from tests.conftest import REPO_ROOT
 
 
 def test_v02_registry_has_new_adapters():
-    discover_adapters()
-    for name in ("cursor", "gemini_cli", "pdf"):
+    discover_all()
+    for name in ("cursor", "gemini_cli"):
         assert name in REGISTRY, f"missing adapter: {name}"
 
 
 def test_new_adapters_subclass_base():
     assert issubclass(CursorAdapter, BaseAdapter)
     assert issubclass(GeminiCliAdapter, BaseAdapter)
-    assert issubclass(PdfAdapter, BaseAdapter)
 
 
 def test_new_adapters_have_schema_versions():
     assert CursorAdapter.SUPPORTED_SCHEMA_VERSIONS
     assert GeminiCliAdapter.SUPPORTED_SCHEMA_VERSIONS
-    assert PdfAdapter.SUPPORTED_SCHEMA_VERSIONS
-
-
-def test_pdf_adapter_requires_explicit_config():
-    # PDF adapter is_available() returns True when pypdf is installed.
-    # The real gate is the `enabled` flag in config — discover_sessions()
-    # returns [] when enabled is False (the default). This test verifies
-    # the practical behavior: no configured roots → no sessions.
-    adapter = PdfAdapter()
-    assert adapter.discover_sessions() == []
 
 
 def test_cursor_adapter_slug_fallback():
@@ -211,5 +199,5 @@ def test_cli_has_v02_subcommands():
 
     parser = build_parser()
     help_text = parser.format_help()
-    for cmd in ("graph", "watch", "export-obsidian"):
+    for cmd in ("graph",):
         assert cmd in help_text, f"missing CLI subcommand: {cmd}"

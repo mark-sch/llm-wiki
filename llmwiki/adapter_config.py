@@ -21,37 +21,6 @@ from typing import Any, Optional
 # ─── Schemas ───────────────────────────────────────────────────────────
 
 ADAPTER_SCHEMAS: dict[str, dict[str, Any]] = {
-    "pdf": {
-        "required_if_enabled": ["source_dirs"],
-        "defaults": {"min_pages": 1, "max_pages": 500},
-        "types": {
-            "source_dirs": list,
-            "min_pages": int,
-            "max_pages": int,
-        },
-    },
-    "meeting": {
-        "required_if_enabled": ["source_dirs"],
-        "defaults": {"extensions": [".vtt", ".srt"]},
-        "types": {
-            "source_dirs": list,
-            "extensions": list,
-        },
-    },
-    "jira": {
-        "required_if_enabled": ["server", "email", "api_token"],
-        "defaults": {
-            "jql": "assignee = currentUser()",
-            "max_results": 50,
-        },
-        "types": {
-            "server": str,
-            "email": str,
-            "api_token": str,
-            "jql": str,
-            "max_results": int,
-        },
-    },
     "web_clipper": {
         "required_if_enabled": ["watch_dir"],
         "defaults": {"extensions": [".md"], "auto_queue": True},

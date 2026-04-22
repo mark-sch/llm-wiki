@@ -57,6 +57,9 @@ wiki/categories/*
 # and they'll be picked up automatically.
 !wiki/projects/
 
+# Graphify output (AI-powered knowledge graph).
+graphify-out/
+
 # Generated static HTML site (Karpathy layer 3).
 site/
 site-html/

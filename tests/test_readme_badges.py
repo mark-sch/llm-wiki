@@ -134,7 +134,7 @@ def test_no_stale_lint_rule_counts_in_user_docs():
     from llmwiki.lint import REGISTRY
     from llmwiki.lint import rules  # noqa: F401 — force registration
     live = len(REGISTRY)
-    assert live >= 15, "unexpectedly low lint-rule count"
+    assert live >= 14, "unexpectedly low lint-rule count"
 
     targets = [
         REPO_ROOT / "README.md",
@@ -181,30 +181,4 @@ def test_no_stale_lint_rule_counts_in_user_docs():
     )
 
 
-# ─── Demo asset (issue #129's "video demo/walkthrough" checkbox) ──────
-
-
-def test_demo_gif_exists_and_is_referenced_from_readme(readme_text: str):
-    gif = REPO_ROOT / "docs" / "demo.gif"
-    assert gif.is_file(), (
-        f"expected demo GIF at {gif.relative_to(REPO_ROOT)} — regenerate "
-        "via `scripts/demo-record.sh` + `asciinema rec` + `cast-to-gif.py`"
-    )
-    assert "docs/demo.gif" in readme_text, (
-        "demo.gif exists but isn't embedded in README — add "
-        "`![llm-wiki demo](docs/demo.gif)` so GitHub renders it"
-    )
-
-
-def test_demo_record_script_executable_and_uses_new_v11_features():
-    script = REPO_ROOT / "scripts" / "demo-record.sh"
-    assert script.is_file()
-    text = script.read_text(encoding="utf-8")
-    # The script should exercise the v1.1 additions so future regenerations
-    # capture them (#35 Ollama ≈ synthesize, #50 --estimate, #51 candidates).
-    assert "synthesize --estimate" in text, (
-        "demo script doesn't showcase the --estimate cost preview (v1.1 · #50)"
-    )
-    assert "candidates list" in text, (
-        "demo script doesn't showcase the candidates workflow (v1.1 · #51)"
-    )
+# Demo asset tests removed — demo GIF/scripts cleaned up in simplification.

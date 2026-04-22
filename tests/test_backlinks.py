@@ -287,9 +287,10 @@ def test_prune_all_dry_run_keeps_blocks(tmp_path):
     assert "BACKLINKS" in text
 
 
-# ─── CLI ────────────────────────────────────────────────────────────────
+# ─── CLI (subcommand removed — skip) ────────────────────────────────────
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_dry_run(tmp_path):
     wiki = _mk_wiki(tmp_path)
     before = (wiki / "entities" / "X.md").read_text(encoding="utf-8")
@@ -300,6 +301,7 @@ def test_cli_backlinks_dry_run(tmp_path):
     assert before == after
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_prune(tmp_path):
     wiki = _mk_wiki(tmp_path)
     b.inject_all(wiki)
@@ -310,6 +312,7 @@ def test_cli_backlinks_prune(tmp_path):
     assert "BACKLINKS" not in text
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_verbose_prints_top(tmp_path):
     wiki = _mk_wiki(tmp_path)
     cp = _run("backlinks", "--wiki-dir", str(wiki), "--verbose")
@@ -317,11 +320,13 @@ def test_cli_backlinks_verbose_prints_top(tmp_path):
     assert "X: 2 referrer" in cp.stdout
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_missing_wiki_errors(tmp_path):
     cp = _run("backlinks", "--wiki-dir", str(tmp_path / "nope"))
     assert cp.returncode == 2
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_help_shows_flags():
     cp = _run("backlinks", "--help")
     assert cp.returncode == 0
@@ -329,6 +334,7 @@ def test_cli_backlinks_help_shows_flags():
         assert flag in cp.stdout
 
 
+@pytest.mark.skip(reason="backlinks CLI subcommand removed")
 def test_cli_backlinks_max_entries_respected(tmp_path):
     wiki = tmp_path / "wiki"
     (wiki / "entities").mkdir(parents=True)

@@ -39,53 +39,50 @@
     "lint": "manual"
   },
 
-  "_adapters_comment": "Opt-in adapters (meeting, jira, pdf). All disabled by default — enable explicitly.",
-
-  "pdf": {
-    "enabled": false,
-    "_comment": "Extract text from PDF files into raw/ markdown.",
-    "source_dirs": ["~/Documents/PDFs"],
-    "min_pages": 1,
-    "max_pages": 500
+  "_vault_comment": "Default vault path for --vault flag. Set to your Obsidian/Logseq vault. Empty = must pass --vault explicitly.",
+  "vault": {
+    "default_path": "",
+    "layout": {
+      "entities": "Wiki/Entities",
+      "concepts": "Wiki/Concepts",
+      "sources": "Wiki/Sources",
+      "syntheses": "Wiki/Syntheses",
+      "candidates": "Wiki/Candidates"
+    },
+    "allow_overwrite": false
   },
 
-  "meeting": {
-    "enabled": false,
-    "_comment": "Meeting transcript adapter (VTT/SRT). See llmwiki/adapters/meeting.py.",
-    "source_dirs": ["~/Meetings"],
-    "extensions": [".vtt", ".srt"]
+  "_graph_comment": "Default graph engine. builtin = stdlib wikilink graph (zero deps). graphify = AI-powered (requires pip install llmwiki[graph]).",
+  "graph": {
+    "default_engine": "builtin",
+    "format": "both"
   },
 
-  "jira": {
-    "enabled": false,
-    "_comment": "Jira REST API adapter. Requires 'jira' package: pip install jira",
-    "server": "https://your-company.atlassian.net",
-    "email": "you@example.com",
-    "api_token": "",
-    "jql": "assignee = currentUser() AND resolution = Unresolved",
-    "max_results": 50
+  "_serve_comment": "Default serve settings.",
+  "serve": {
+    "port": 8765,
+    "host": "127.0.0.1",
+    "open_browser": false
   },
+
+  "_build_comment": "Default build settings.",
+  "build": {
+    "out_dir": "site",
+    "search_mode": "auto",
+    "synthesize": false
+  },
+
+  "_adapters_comment": "Contrib adapters. All disabled by default — enable with: llmwiki sync --adapter <name>",
 
   "web_clipper": {
     "enabled": false,
-    "_comment": "Obsidian Web Clipper intake path. See llmwiki/web_clipper.py.",
+    "_comment": "Obsidian Web Clipper intake path.",
     "watch_dir": "raw/web",
     "extensions": [".md"],
     "auto_queue": true
   },
 
-  "scheduled_sync": {
-    "enabled": false,
-    "_comment": "Auto-sync cadence for `llmwiki schedule` task generator. Values: daily | weekly | hourly. Run `llmwiki schedule` to generate OS-specific files.",
-    "cadence": "daily",
-    "hour": 3,
-    "minute": 0,
-    "weekday": 0,
-    "working_dir": "~/llm-wiki",
-    "llmwiki_bin": "/usr/local/bin/llmwiki"
-  },
-
-  "_synthesis_comment": "LLM backend for auto-synthesizing wiki source pages (#35). backend=dummy (default, offline) | ollama (local HTTP). Ollama must be running: `ollama serve`. Run `llmwiki synthesize --check` to probe the server.",
+  "_synthesis_comment": "LLM backend for auto-synthesizing wiki source pages. backend=dummy (default, offline) | ollama (local HTTP). Run `llmwiki synthesize --check` to probe the server.",
   "synthesis": {
     "backend": "dummy",
     "model": "llama3.1:8b",

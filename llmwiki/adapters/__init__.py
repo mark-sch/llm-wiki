@@ -9,6 +9,12 @@ parse them into a stream of records. Adapters register themselves on import.
     adapter = adapter_cls(config)
     for path in adapter.discover_sessions():
         ...
+
+Core adapters (always loaded):
+    claude_code, codex_cli
+
+Contrib adapters (loaded on demand via --adapter flag):
+    chatgpt, copilot_chat, copilot_cli, cursor, gemini_cli, obsidian, opencode
 """
 
 from __future__ import annotations
@@ -18,6 +24,12 @@ from typing import Any
 from llmwiki.adapters.base import BaseAdapter
 
 REGISTRY: dict[str, type[BaseAdapter]] = {}
+
+# Contrib adapters that can be loaded on demand.
+CONTRIB_ADAPTERS = {
+    "chatgpt", "copilot_chat", "copilot_cli",
+    "cursor", "gemini_cli", "obsidian", "opencode",
+}
 
 
 def register(name: str):
@@ -30,20 +42,35 @@ def register(name: str):
 
 
 def discover_adapters() -> None:
-    """Import all built-in adapters so they register themselves."""
-    # Order matters only for stable listing.
+    """Import core adapters so they register themselves."""
     from llmwiki.adapters import claude_code  # noqa: F401
     from llmwiki.adapters import codex_cli  # noqa: F401
-    from llmwiki.adapters import copilot_chat  # noqa: F401
-    from llmwiki.adapters import copilot_cli  # noqa: F401
-    from llmwiki.adapters import cursor  # noqa: F401
-    from llmwiki.adapters import gemini_cli  # noqa: F401
-    from llmwiki.adapters import obsidian  # noqa: F401
-    from llmwiki.adapters import pdf  # noqa: F401
-    from llmwiki.adapters import meeting  # noqa: F401
-    from llmwiki.adapters import jira_adapter  # noqa: F401
-    from llmwiki.adapters import chatgpt  # noqa: F401
-    from llmwiki.adapters import opencode  # noqa: F401
+
+
+def discover_contrib(names: list[str] | None = None) -> None:
+    """Import contrib adapters on demand.
+
+    Parameters
+    ----------
+    names : list[str] | None
+        Specific adapter names to load. If None, loads all contrib adapters.
+    """
+    targets = names if names else CONTRIB_ADAPTERS
+    for name in targets:
+        if name not in CONTRIB_ADAPTERS:
+            continue
+        try:
+            __import__(f"llmwiki.adapters.contrib.{name}")
+        except ImportError as e:
+            import sys
+            print(f"  warning: contrib adapter {name!r} failed to load: {e}",
+                  file=sys.stderr)
+
+
+def discover_all() -> None:
+    """Import all adapters (core + contrib)."""
+    discover_adapters()
+    discover_contrib()
 
 
 def get_available() -> dict[str, type[BaseAdapter]]:

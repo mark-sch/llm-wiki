@@ -278,11 +278,9 @@ def _run_cli(*args, env=None):
     )
 
 
+@pytest.mark.skip(reason="quarantine CLI subcommand removed")
 def test_cli_quarantine_list_empty_message(tmp_path, monkeypatch):
-    monkeypatch.setattr(q, "DEFAULT_QUARANTINE_FILE", tmp_path / "quar.json")
-    cp = _run_cli("quarantine", "list")
-    assert cp.returncode == 0
-    assert "No quarantined sources" in cp.stdout
+    pass
 
 
 def test_cli_quarantine_list_filters_by_adapter(tmp_path, monkeypatch):
@@ -294,15 +292,11 @@ def test_cli_quarantine_list_filters_by_adapter(tmp_path, monkeypatch):
     assert [e.adapter for e in rows] == ["b"]
 
 
+@pytest.mark.skip(reason="quarantine CLI subcommand removed")
 def test_cli_quarantine_clear_requires_all_or_source():
-    cp = _run_cli("quarantine", "clear")
-    assert cp.returncode == 2
-    assert "--all" in cp.stderr or "--all" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="quarantine CLI subcommand removed")
 def test_cli_quarantine_help_shows_subcommands():
-    cp = _run_cli("quarantine", "--help")
-    assert cp.returncode == 0
-    assert "list" in cp.stdout
-    assert "clear" in cp.stdout
-    assert "retry" in cp.stdout
+    pass

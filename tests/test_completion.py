@@ -61,8 +61,8 @@ def test_bash_includes_every_subcommand():
     script = bash_script()
     # All key subcommands must appear in the WORD list
     for sub in ["sync", "build", "serve", "init", "version",
-                "adapters", "graph", "watch", "link-obsidian",
-                "install-skills", "schedule", "lint", "check-links"]:
+                "adapters", "graph", "lint", "export",
+                "candidates", "synthesize"]:
         assert sub in script, f"missing subcommand: {sub}"
 
 
@@ -107,28 +107,27 @@ def test_fish_has_flag_completions():
 def test_fish_includes_every_subcommand():
     script = fish_script()
     for sub in ["sync", "build", "serve", "init", "lint",
-                "link-obsidian", "install-skills", "completion"]:
+                "export", "candidates", "synthesize"]:
         assert f"-a '{sub}'" in script
 
 
 def test_fish_completes_flags_for_sync():
     script = fish_script()
-    # sync has --auto-build, --auto-lint, --dry-run, --force, --download-images, etc.
+    # sync has --auto-build, --auto-lint, --force, etc.
     assert "-n '__fish_seen_subcommand_from sync'" in script
 
 
 # ─── CLI integration ────────────────────────────────────────────────
 
 
-def test_cli_completion_subcommand_exists():
-    """`llmwiki completion` subcommand is registered."""
+def test_cli_completion_subcommand_removed():
+    """`llmwiki completion` subcommand has been removed."""
     from llmwiki.cli import build_parser
     parser = build_parser()
-    # Walk subparsers to confirm "completion" exists
     sub_action = None
     for a in parser._actions:
         if hasattr(a, "choices") and a.choices:
             sub_action = a
             break
     assert sub_action is not None
-    assert "completion" in sub_action.choices
+    assert "completion" not in sub_action.choices

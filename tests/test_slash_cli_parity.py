@@ -41,6 +41,12 @@ NON_WRAPPER_SLASHES = {
     "triage-issue",    # prompt-driven
 }
 
+# Slash files whose CLI subcommand was removed. They're excluded from
+# both wrapper-parity and non-wrapper-parity checks.
+LEGACY_SLASH_FILES = {
+    "wiki-export-marp",  # export-marp CLI subcommand removed
+}
+
 
 def _cli_subcommands() -> set[str]:
     from llmwiki.cli import build_parser
@@ -91,7 +97,7 @@ def test_every_wrapper_slash_points_at_a_real_subcommand():
     cli = _cli_subcommands()
     offenders: list[str] = []
     for p in _all_slash_files():
-        if p.stem in NON_WRAPPER_SLASHES:
+        if p.stem in NON_WRAPPER_SLASHES | LEGACY_SLASH_FILES:
             continue
         sub = _wrapped_subcommand(p)
         if sub is None:
@@ -111,7 +117,7 @@ def test_wrapper_slash_name_matches_cli_subcommand():
     ``/wiki-review`` → ``candidates`` split that we fixed in #272."""
     mismatches: list[str] = []
     for p in _all_slash_files():
-        if p.stem in NON_WRAPPER_SLASHES:
+        if p.stem in NON_WRAPPER_SLASHES | LEGACY_SLASH_FILES:
             continue
         sub = _wrapped_subcommand(p)
         if sub is None:
@@ -133,7 +139,7 @@ def test_wrapper_slash_name_matches_cli_subcommand():
 def test_every_wrapper_slash_has_at_least_one_bash_example():
     offenders: list[str] = []
     for p in _all_slash_files():
-        if p.stem in NON_WRAPPER_SLASHES:
+        if p.stem in NON_WRAPPER_SLASHES | LEGACY_SLASH_FILES:
             continue
         text = p.read_text(encoding="utf-8")
         if "```" not in text and "python3" not in text:
@@ -149,7 +155,6 @@ def test_known_wrappers_match_expected_set():
     expected = {
         "wiki-build": "build",
         "wiki-candidates": "candidates",
-        "wiki-export-marp": "export-marp",
         "wiki-graph": "graph",
         "wiki-init": "init",
         "wiki-serve": "serve",

@@ -89,7 +89,6 @@ llmwiki runs two interchangeable ways. Pick one, start — you can switch later.
 - **[Command cheatsheet](cheatsheet.md)** — every slash + CLI command on one page.
 - **[Upgrade guide](UPGRADING.md)** — what changes between releases, migrations, opt-ins.
 - **[FAQ](faq.md)** · **[Troubleshooting](troubleshooting.md)** · **[Privacy](privacy.md)**.
-- **[Testing — visual regression](testing/visual-regression.md)**.
 - **[Accessibility](accessibility.md)** (WCAG 2.1 AA).
 - **[Benchmarks](benchmarks.md)** · **[Competitor landscape](competitor-landscape.md)**.
 - **Maintainers** — governance docs at [`docs/maintainers/`](https://github.com/Pratiyush/llm-wiki/tree/master/docs/maintainers).

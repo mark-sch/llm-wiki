@@ -12,10 +12,9 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from llmwiki.adapters.claude_code import ClaudeCodeAdapter
 from llmwiki.adapters.codex_cli import CodexCliAdapter
-from llmwiki.adapters.cursor import CursorAdapter
-from llmwiki.adapters.gemini_cli import GeminiCliAdapter
-from llmwiki.adapters.obsidian import ObsidianAdapter
-from llmwiki.adapters.pdf import PdfAdapter
+from llmwiki.adapters.contrib.cursor import CursorAdapter
+from llmwiki.adapters.contrib.gemini_cli import GeminiCliAdapter
+from llmwiki.adapters.contrib.obsidian import ObsidianAdapter
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -124,15 +123,6 @@ def test_dotdir_adapters_are_cross_platform():
             f"{cls.__name__} uses non-dot-dir paths but is not in the "
             f"OS-specific adapter list"
         )
-
-
-# ── PDF adapter is exempt (user-configured, no defaults) ────────────
-
-def test_pdf_adapter_has_empty_defaults():
-    """PDF adapter intentionally has no defaults — user must configure roots."""
-    assert PdfAdapter.DEFAULT_ROOTS == [], (
-        "PdfAdapter should have empty DEFAULT_ROOTS (user-configured)"
-    )
 
 
 # ── every adapter's paths resolve under Path.home() ─────────────────

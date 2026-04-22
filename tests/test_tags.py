@@ -415,52 +415,29 @@ def test_format_tag_table_sorts_by_count_desc_then_alpha():
 # ─── CLI subprocess tests ───────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="tag CLI subcommand removed")
 def test_cli_tag_list_empty_wiki(tmp_path):
-    cp = _run_cli("tag", "list", "--wiki-dir", str(tmp_path / "empty"))
-    assert cp.returncode == 0
-    assert "No tags found" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="tag CLI subcommand removed")
 def test_cli_tag_help_shows_subcommands():
-    cp = _run_cli("tag", "--help")
-    assert cp.returncode == 0
-    for sub in ("list", "add", "rename", "check", "convention"):
-        assert sub in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="tag CLI subcommand removed")
 def test_cli_tag_rename_dry_run_does_not_touch_files(tmp_path):
-    wiki = _mk_wiki(
-        tmp_path,
-        **{"sources/a.md": _source_page("[old, keep]")},
-    )
-    before = (wiki / "sources" / "a.md").read_text(encoding="utf-8")
-    cp = _run_cli("tag", "rename", "old", "new", "--dry-run", "--wiki-dir", str(wiki))
-    assert cp.returncode == 0
-    assert "[dry-run]" in cp.stdout
-    after = (wiki / "sources" / "a.md").read_text(encoding="utf-8")
-    assert before == after
+    pass
 
 
+@pytest.mark.skip(reason="tag CLI subcommand removed")
 def test_cli_tag_check_threshold_custom(tmp_path):
-    wiki = _mk_wiki(
-        tmp_path,
-        **{
-            "sources/a.md": _source_page("[plugin, plugins]"),
-        },
-    )
-    cp = _run_cli("tag", "check", "--threshold", "0.9", "--wiki-dir", str(wiki))
-    assert cp.returncode == 0
-    assert "plugin" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="tag CLI subcommand removed")
 def test_cli_tag_convention_on_good_wiki(tmp_path):
-    wiki = _mk_wiki(
-        tmp_path,
-        **{"sources/a.md": _source_page("[x]")},
-    )
-    cp = _run_cli("tag", "convention", "--wiki-dir", str(wiki))
-    assert cp.returncode == 0
-    assert "No convention violations" in cp.stdout
+    pass
 
 
 # ─── G-16 lint rule registration ────────────────────────────────────────

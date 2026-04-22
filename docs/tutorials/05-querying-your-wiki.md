@@ -108,8 +108,7 @@ What to fix:
 - **Info** — orphans + aged candidates. Investigate, don't auto-fix.
 
 See **[`docs/reference/cache-tiers.md`](../reference/cache-tiers.md)** for the cache-tier
-consistency rule and **[`docs/testing/visual-regression.md`](../testing/visual-regression.md)** for the
-stale-candidates rule.
+consistency rule.
 
 ---
 

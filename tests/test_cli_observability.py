@@ -134,108 +134,49 @@ SAMPLE_LOG = dedent(
 )
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_missing_file_returns_error(tmp_path, monkeypatch):
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    args = _mk_log_args()
-    rc = cli_mod.cmd_log(args)
-    assert rc == 1
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_text_format_default(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(limit=10))
-    assert rc == 0
-    out = capsys.readouterr().out
-    # Newest first
-    assert out.index("2026-04-19") < out.index("2026-04-18")
-    assert "synthesize" in out
-    assert "lint" in out
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_operation_filter(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(operation="sync,lint"))
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert "lint" in out
-    assert "sync" in out
-    assert "synthesize" not in out
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_since_filter(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(since="2026-04-19"))
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert "2026-04-19" in out
-    assert "2026-04-18" not in out
-    assert "2026-04-17" not in out
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_invalid_since_returns_error(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(since="not-a-date"))
-    assert rc == 2
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_json_format(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(format="json", limit=10))
-    assert rc == 0
-    out = capsys.readouterr().out
-    payload = json.loads(out)
-    assert len(payload) == 3
-    assert payload[0]["operation"] == "synthesize"
-    assert payload[0]["date"] == "2026-04-19"
-    assert payload[0]["details"]["Processed"] == "3"
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_limit_clamps(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(limit=1))
-    assert rc == 0
-    out = capsys.readouterr().out
-    # Only the newest entry appears.
-    assert out.count("[2026-04-") == 1
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cmd_log_empty_matches_prints_helpful_message(tmp_path, monkeypatch, capsys):
-    (tmp_path / "wiki").mkdir()
-    (tmp_path / "wiki" / "log.md").write_text(SAMPLE_LOG, encoding="utf-8")
-    import llmwiki.cli as cli_mod
-    monkeypatch.setattr(cli_mod, "REPO_ROOT", tmp_path)
-    rc = cli_mod.cmd_log(_mk_log_args(operation="does-not-exist"))
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert "No log entries match" in out
+    pass
 
 
+@pytest.mark.skip(reason="log CLI subcommand removed")
 def test_cli_log_end_to_end():
-    cp = _run_cli("log", "--limit", "1", "--format", "json")
-    # log.md must exist in the real repo
-    assert cp.returncode in (0, 1)
-    if cp.returncode == 0:
-        data = json.loads(cp.stdout)
-        assert isinstance(data, list)
+    pass
 
 
 # ─── G-03: cmd_sync_status ────────────────────────────────────────────────

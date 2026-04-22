@@ -56,6 +56,7 @@ dependencies = [
 # highlight.js via CDN, so no Python-side highlighter dep is needed.
 highlight = []
 pdf = ["pypdf>=6.10.2"]
+graph = ["graphifyy>=0.4.20"]
 dev = [
     "pytest>=7.0",
     "ruff>=0.15.10",
@@ -73,6 +74,7 @@ e2e = [
 ]
 all = [
     "pypdf>=6.10.2",
+    "graphifyy>=0.4.20",
 ]
 
 [project.urls]
@@ -87,7 +89,7 @@ Releases = "https://github.com/Pratiyush/llm-wiki/releases"
 llmwiki = "llmwiki.cli:main"
 
 [tool.setuptools]
-packages = ["llmwiki", "llmwiki.adapters", "llmwiki.mcp"]
+packages = ["llmwiki", "llmwiki.adapters", "llmwiki.adapters.contrib", "llmwiki.lint", "llmwiki.mcp", "llmwiki.render", "llmwiki.synth"]
 
 [tool.setuptools.package-data]
 llmwiki = ["py.typed"]

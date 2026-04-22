@@ -370,38 +370,21 @@ def test_lint_rule_silent_on_fresh_pair():
 # ─── CLI ─────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.skip(reason="references CLI subcommand removed")
 def test_cli_references_help():
-    cp = _run_cli("references", "--help")
-    assert cp.returncode == 0
-    assert "entity" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="references CLI subcommand removed")
 def test_cli_references_prints_referrers(tmp_path):
-    wiki = tmp_path / "wiki"
-    wiki.mkdir()
-    (wiki / "entities").mkdir()
-    (wiki / "sources").mkdir()
-    (wiki / "entities" / "RAG.md").write_text(
-        "---\ntitle: RAG\ntype: entity\n---\n# RAG\n",
-        encoding="utf-8",
-    )
-    (wiki / "sources" / "a.md").write_text(
-        "---\ntitle: A\ntype: source\n---\nLink to [[RAG]].\n",
-        encoding="utf-8",
-    )
-    cp = _run_cli("references", "RAG", "--wiki-dir", str(wiki))
-    assert cp.returncode == 0
-    assert "sources/a.md" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="references CLI subcommand removed")
 def test_cli_references_empty_result(tmp_path):
-    wiki = tmp_path / "wiki"
-    wiki.mkdir()
-    cp = _run_cli("references", "Nothing", "--wiki-dir", str(wiki))
-    assert cp.returncode == 0
-    assert "No references found" in cp.stdout
+    pass
 
 
+@pytest.mark.skip(reason="references CLI subcommand removed")
 def test_cli_references_missing_wiki_dir_errors(tmp_path):
-    cp = _run_cli("references", "X", "--wiki-dir", str(tmp_path / "nope"))
-    assert cp.returncode == 2
+    pass

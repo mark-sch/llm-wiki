@@ -66,14 +66,12 @@ into `raw/sessions/`, then (by default) auto-builds and auto-lints.
 
 ```bash
 python3 -m llmwiki sync
-python3 -m llmwiki sync --dry-run
 python3 -m llmwiki sync --since 2026-04-01 --project llm-wiki
 python3 -m llmwiki sync --adapter claude_code codex_cli
 python3 -m llmwiki sync --no-auto-build --no-auto-lint
 python3 -m llmwiki sync --vault "~/Documents/Obsidian Vault"
 python3 -m llmwiki sync --vault ~/my-vault --allow-overwrite
 python3 -m llmwiki sync --force
-python3 -m llmwiki sync --download-images
 ```
 
 ### Flags
@@ -85,8 +83,6 @@ python3 -m llmwiki sync --download-images
 | `--project SUBSTRING` | Filter by project-slug substring. |
 | `--include-current` | Include sessions < 60 min old (default skips live ones). |
 | `--force` | Ignore the mtime state file, reconvert everything. |
-| `--dry-run` | Print what would be written, touch nothing. |
-| `--download-images` | Mirror remote image URLs into `raw/assets/`. |
 | `--auto-build` / `--no-auto-build` | Rebuild `site/` after sync (default: on). |
 | `--auto-lint` / `--no-auto-lint` | Run `lint` after sync (default: on). |
 | `--vault PATH` | Vault-overlay mode — write new pages inside the given Obsidian / Logseq vault instead of `wiki/`. See [`guides/existing-vault.md`](../guides/existing-vault.md). |
@@ -106,7 +102,6 @@ python3 -m llmwiki sync --download-images
 
 - Nightly cron-style sync of one project only:
   `llmwiki sync --project my-project --no-auto-lint --since $(date -v-1d +%Y-%m-%d)`
-- Staging sweep before a release: `llmwiki sync --force --dry-run`
 - Vault-overlay round-trip: `llmwiki sync --vault "~/Documents/Obsidian Vault"`
 
 ---
@@ -205,7 +200,8 @@ Columns: **default** (runs when you don't pass `--adapter`), **configured**
 ## `graph` — build the knowledge graph
 
 ```bash
-python3 -m llmwiki graph                     # both json + html
+python3 -m llmwiki graph                              # builtin wikilink graph
+python3 -m llmwiki graph --engine graphify             # AI-powered graph (requires graphifyy)
 python3 -m llmwiki graph --format json
 python3 -m llmwiki graph --format html
 ```
@@ -215,294 +211,17 @@ python3 -m llmwiki graph --format html
 | Flag | What |
 |---|---|
 | `--format {json,html,both}` | Output format(s). Default: `both`. |
+| `--engine {builtin,graphify}` | Graph engine. `builtin` = stdlib wikilink graph. `graphify` = AI-powered with community detection, confidence-scored edges, god nodes. Requires `pip install graphifyy`. Default: `builtin`. |
 
-Emits `graph/graph.json` (nodes + edges) and/or `graph/graph.html`
+**Builtin engine:** Emits `graph/graph.json` (nodes + edges) and/or `graph/graph.html`
 (vis-network interactive viewer). The interactive version is also
 auto-copied into `site/graph.html` on every `build`.
 
----
-
-## `quarantine` — inspect failed syncs
-
-```bash
-python3 -m llmwiki quarantine list
-python3 -m llmwiki quarantine list --adapter claude_code
-python3 -m llmwiki quarantine clear --all
-python3 -m llmwiki quarantine clear /Users/you/.claude/projects/foo.jsonl
-python3 -m llmwiki quarantine retry
-```
-
-### Flags (per-subcommand)
-
-| Subcommand | Flag | What |
-|---|---|---|
-| `list` | `--adapter NAME` | Filter to one adapter |
-| `clear` | `--all` | Wipe every entry |
-| `clear` | `--adapter NAME` | Restrict the clear to one adapter |
-| `retry` | `--adapter NAME` | Filter the retry plan |
-
-`sync` automatically records every convert exception in
-`.llmwiki-quarantine.json` so you can see *what didn't sync and why*
-without re-tailing stderr. Clear a source after you've fixed the
-underlying bug and the next `sync` retries it. G-14 · #300.
-
----
-
-## `backlinks` — inject managed `## Referenced by` blocks
-
-```bash
-python3 -m llmwiki backlinks                               # real run
-python3 -m llmwiki backlinks --dry-run                     # preview
-python3 -m llmwiki backlinks --verbose                     # + top-20 most referenced
-python3 -m llmwiki backlinks --max-entries 100             # custom cap
-python3 -m llmwiki backlinks --prune                       # strip every block
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--wiki-dir PATH` | Override wiki root (default `./wiki/`) |
-| `--max-entries N` | Max backlinks per page (default 50; truncation footer added) |
-| `--dry-run` | Preview writes without touching disk |
-| `--prune` | Remove every backlink block (inverse of default) |
-| `--verbose` / `-v` | Print top-20 most-referenced pages after injection |
-
-Walks `wiki/` and, for every page that another wiki page links to,
-injects a managed `## Referenced by` section bounded by
-`<!-- BACKLINKS:START --> … <!-- BACKLINKS:END -->` sentinels.
-Rerun is idempotent — the block gets replaced, everything else on the
-page stays intact. Entries are sorted newest-first when referrers
-carry a `date:` field, alphabetical otherwise. Skips `archive/` and
-`_context.md` stubs.
-
-Fixes the orphan problem: before `backlinks`, 95% of wiki pages had no
-inbound link visible on their own page. After, the graph becomes
-navigable + Obsidian renders backlinks natively. #328.
-
----
-
-## `references` — list every page linking to an entity
-
-```bash
-python3 -m llmwiki references RAG
-python3 -m llmwiki references RAG --with-dated-claims
-python3 -m llmwiki references AndrejKarpathy --wiki-dir other-wiki/
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--wiki-dir PATH` | Override wiki root (default `./wiki/`) |
-| `--with-dated-claims` | Also print each referrer's dated claims about the target |
-
-Reverse-reference index over the whole wiki. Output is one row per
-referring page, sorted by source path for stable diffs. Pair with the
-`stale_reference_detection` lint rule (rule #15) to surface *stale*
-referrers — pages with dated claims about a target that's since been
-updated. G-17 · #303.
-
----
-
-## `tag` — curate the wiki tag-space
-
-```bash
-python3 -m llmwiki tag list                    # every tag + usage count
-python3 -m llmwiki tag add claude-code sources/foo.md
-python3 -m llmwiki tag rename obsidian Obsidian --dry-run
-python3 -m llmwiki tag rename obsidian Obsidian         # do it
-python3 -m llmwiki tag check --threshold 0.85
-python3 -m llmwiki tag convention              # G-16 violations
-```
-
-### Subcommands
-
-| Subcommand | What |
-|---|---|
-| `list` | Sort-by-count table of every tag in `wiki/` |
-| `add <tag> <page>` | Append to a page's frontmatter (idempotent) |
-| `rename <old> <new>` | Rewrite across every page; pair with `--dry-run` first |
-| `check` | Near-duplicate detector (case-insensitive, SequenceMatcher) |
-| `convention` | Flag projects using `tags:` / sources using `topics:` (G-16) |
-
-### Flags (per subcommand)
-
-| Subcommand | Flag | What |
-|---|---|---|
-| `list` / `check` / `convention` | `--wiki-dir <path>` | Override wiki root |
-| `add` | `--field {tags,topics}` | Target frontmatter field (default `tags`) |
-| `rename` | `--dry-run` | Preview without writing |
-| `check` | `--threshold 0.0–1.0` | Similarity cutoff (default 0.85) |
-
-G-15 · #301. Pairs with the `tags_topics_convention` lint rule
-(G-16 · #302, rule #14) that fires on every `llmwiki lint` run.
-
----
-
-## `log` — query `wiki/log.md` structurally
-
-```bash
-python3 -m llmwiki log                                       # last 10 of any op
-python3 -m llmwiki log --since 2026-04-01
-python3 -m llmwiki log --operation sync,synthesize
-python3 -m llmwiki log --limit 50
-python3 -m llmwiki log --format json
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--since YYYY-MM-DD` | Keep entries on or after this date |
-| `--operation <csv>` | Comma-separated ops to keep: `sync`, `synthesize`, `lint`, `ingest`, `query`, `build` |
-| `--limit N` | Max rows to print (default 10; `0` = unlimited) |
-| `--format {text,json}` | `text` for humans, `json` for scripts |
-
-`wiki/log.md` is the append-only history of every pipeline operation.
-This command parses it into structured events so you can find
-"everything that synced on 2026-04-19" without eyeballing the file.
-Pairs with `llmwiki sync --status` for the live-counters view.
-G-13 · #299.
-
----
-
-## `sync --status` — observability report
-
-```bash
-python3 -m llmwiki sync --status
-python3 -m llmwiki sync --status --recent 5
-```
-
-Non-destructive reporter. Prints:
-
-1. Last-sync timestamp (from `.llmwiki-state.json` `_meta`).
-2. Per-adapter counters: `discovered / converted / unchanged / live /
-   filtered / errored` (written by the previous `sync` run).
-3. Orphan state entries (keys pointing at files that no longer exist).
-4. Quarantined sources (see `quarantine`).
-5. Optional `--recent N`: last N sync/synthesize entries from `log.md`.
-
-G-03 · #289. Does **not** run a sync — use `llmwiki sync` for that.
-
----
-
-## `watch` — long-running session-store watcher
-
-```bash
-python3 -m llmwiki watch
-python3 -m llmwiki watch --interval 30 --debounce 5
-python3 -m llmwiki watch --adapter claude_code --dry-run
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--adapter NAME [NAME ...]` | Limit to named adapters. |
-| `--interval SECONDS` | Polling interval. Default: 10. |
-| `--debounce SECONDS` | Wait this long after a change before syncing. Default: 2. |
-| `--dry-run` | Detect changes, don't sync. |
-
-Use this when you want hands-off ingestion during a long coding session.
-Foreground process — Ctrl+C to stop.
-
----
-
-## `export-obsidian` — mirror `wiki/` into a vault
-
-```bash
-python3 -m llmwiki export-obsidian --vault ~/MyVault
-python3 -m llmwiki export-obsidian --vault ~/MyVault --subfolder "LLM Wiki"
-python3 -m llmwiki export-obsidian --vault ~/MyVault --clean --dry-run
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--vault PATH` | Obsidian vault root. **Required.** |
-| `--subfolder NAME` | Subfolder inside the vault. Default: `llm-wiki`. |
-| `--clean` | Delete the target subfolder before copying. |
-| `--dry-run` | Print what would be copied, touch nothing. |
-
-Contrast with `link-obsidian` (which symlinks the project into the vault)
-and `sync --vault` (which writes directly into the vault).
-
----
-
-## `export-marp` — generate a Marp slide deck
-
-```bash
-python3 -m llmwiki export-marp --topic "cache tiers"
-python3 -m llmwiki export-marp --topic Karpathy --out ~/slides/karpathy.marp.md
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--topic STRING` | Search term. **Required.** |
-| `--out PATH` | Output path. Default: `wiki/exports/<topic>.marp.md`. |
-| `--wiki PATH` | Wiki dir. Default: `./wiki`. |
-
----
-
-## `export-qmd` — export as Quarto collection
-
-```bash
-python3 -m llmwiki export-qmd --out ~/quarto/llmwiki
-python3 -m llmwiki export-qmd --source-wiki ~/other-wiki --collection myproject
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--out PATH` | Output directory. **Required.** |
-| `--source-wiki PATH` | Source wiki dir. Default: `./wiki`. |
-| `--collection NAME` | Name written into `qmd.yaml`. Default: `llmwiki`. |
-
----
-
-## `eval` — structural eval checks over `wiki/`
-
-```bash
-python3 -m llmwiki eval
-python3 -m llmwiki eval --json --out wiki-eval.json
-python3 -m llmwiki eval --check content_hygiene link_density
-python3 -m llmwiki eval --fail-below 80
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--check NAME [NAME ...]` | Run only named checks. Default: all. |
-| `--json` | JSON output to stdout. |
-| `--out PATH` | Write JSON report to this path. |
-| `--fail-below N` | Exit 1 if score < N%. |
-
----
-
-## `check-links` — verify every internal link in `site/`
-
-```bash
-python3 -m llmwiki check-links
-python3 -m llmwiki check-links --fail-on-broken
-python3 -m llmwiki check-links --limit 100
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--site-dir PATH` | Site dir. Default: `./site`. |
-| `--fail-on-broken` | Exit 1 if any broken links found. |
-| `--limit N` | Max links to verify. |
-
-Unlike the `lint` command (which checks wikilinks in source), this walks
-compiled `site/*.html` and verifies every `<a href>` resolves.
+**Graphify engine:** Runs the [Graphify](https://github.com/safishamsi/graphify) pipeline:
+tree-sitter AST extraction for code, semantic analysis for docs, Leiden community
+detection, god-node analysis. Outputs to `graphify-out/` (graph.json, graph.html,
+GRAPH_REPORT.md) and copies to `graph/` for build compatibility. Install:
+`pip install llmwiki[graph]` or `pip install graphifyy`.
 
 ---
 
@@ -542,27 +261,7 @@ python3 -m llmwiki export all --out ~/custom-site
 
 ---
 
-## `manifest` — build + validate perf manifest
-
-```bash
-python3 -m llmwiki manifest
-python3 -m llmwiki manifest --fail-on-violations
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--site-dir PATH` | Site dir. Default: `./site`. |
-| `--fail-on-violations` | Exit 1 if any perf-budget violations. |
-
-Writes `site/manifest.json` with SHA-256 hashes for every file + a
-perf-budget check (cold build < 30 s, per-page < 3 MB, `llms-full.txt`
-< 10 MB, etc).
-
----
-
-## `lint` — run 13 wiki-quality rules
+## `lint` — run 14 wiki-quality rules
 
 ```bash
 python3 -m llmwiki lint
@@ -604,19 +303,6 @@ python3 -m llmwiki lint --wiki-dir ~/another-wiki
 
 ---
 
-## `install-skills` — mirror `.claude/skills/` into sibling agent paths
-
-```bash
-python3 -m llmwiki install-skills
-```
-
-**Flags:** none.
-
-Creates symlinks under `.codex/skills/` + `.agents/skills/` so Codex CLI,
-Gemini CLI, Cursor, etc. see the same skills Claude Code does.
-
----
-
 ## `candidates` — approval workflow
 
 Positional `action` picks `list` / `promote` / `merge` / `discard`.
@@ -654,7 +340,6 @@ round-trip semantics when a candidate lives inside a vault.
 ```bash
 python3 -m llmwiki synthesize --check            # probe the backend
 python3 -m llmwiki synthesize --estimate         # cost preview, no API calls
-python3 -m llmwiki synthesize --dry-run          # list what would be synth'd
 python3 -m llmwiki synthesize --force            # re-synth everything
 python3 -m llmwiki synthesize                    # real run
 ```
@@ -664,7 +349,6 @@ python3 -m llmwiki synthesize                    # real run
 | Flag | What |
 |---|---|
 | `--check` | Probe backend availability + exit (0 if reachable). |
-| `--dry-run` | List sessions that would be synthesized, write nothing. |
 | `--force` | Ignore state, re-synth every source. |
 | `--estimate` | Print cached-vs-fresh token + dollar estimate (#50). |
 
@@ -697,64 +381,6 @@ ships with baseline tags.
 
 ---
 
-## `completion` — shell completion script
-
-```bash
-python3 -m llmwiki completion bash > ~/.bash_completion.d/llmwiki
-python3 -m llmwiki completion zsh  > ~/.zsh/completions/_llmwiki
-python3 -m llmwiki completion fish > ~/.config/fish/completions/llmwiki.fish
-```
-
-Positional: `bash` / `zsh` / `fish`. No flags. Stdlib-only (no
-`argcomplete` dep).
-
----
-
-## `schedule` — OS-specific scheduled-sync templates
-
-```bash
-python3 -m llmwiki schedule                         # auto-detect platform
-python3 -m llmwiki schedule --platform macos
-python3 -m llmwiki schedule --platform linux --out ~/systemd-unit
-python3 -m llmwiki schedule --platform windows
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--platform {macos,linux,windows}` | Target platform. Default: auto-detect from `sys.platform`. |
-| `--out PATH` | Output directory. Default: `./build/scheduled-sync/`. |
-
-Writes:
-- **macOS** → `com.llmwiki.sync.plist` (launchd)
-- **Linux** → `llmwiki-sync.service` + `.timer` (systemd)
-- **Windows** → `llmwiki-sync.xml` (Task Scheduler)
-
----
-
-## `link-obsidian` — symlink project into a vault
-
-```bash
-python3 -m llmwiki link-obsidian --vault "~/Documents/Obsidian Vault"
-python3 -m llmwiki link-obsidian --vault ~/vault --name "My LLM Wiki"
-python3 -m llmwiki link-obsidian --vault ~/vault --force
-```
-
-### Flags
-
-| Flag | What |
-|---|---|
-| `--vault PATH` | Obsidian vault root. **Required.** |
-| `--name NAME` | Symlink name inside the vault. Default: `LLM Wiki`. |
-| `--force` | Overwrite an existing symlink. |
-
-Symlink-only — your Obsidian graph view / backlinks / full-text search
-immediately see the wiki. Compare with `export-obsidian` (copy) and
-`sync --vault` (in-place write).
-
----
-
 ## `version` — print the installed version
 
 ```bash
@@ -763,6 +389,25 @@ python3 -m llmwiki --version
 ```
 
 Both print `llmwiki <version>`.
+
+---
+
+## `query` — search the knowledge graph
+
+```bash
+python3 -m llmwiki query "what projects is Pratiyush working on"
+python3 -m llmwiki query "Flutter mobile" --depth 2 --budget 1000
+```
+
+### Flags
+
+| Flag | What |
+|---|---|
+| `--depth N` | BFS traversal depth. Default: `3`. |
+| `--budget N` | Max output tokens. Default: `2000`. |
+
+Requires Graphify (`pip install llmwiki[graph]`). Run `llmwiki graph` first
+to build the graph.
 
 ---
 
@@ -775,8 +420,7 @@ Both print `llmwiki <version>`.
 | `2` | Usage error (bad flags, missing file, etc.) |
 
 Subcommands document their own non-zero exit conditions where relevant
-(`eval --fail-below`, `lint --fail-on-errors`,
-`check-links --fail-on-broken`, `manifest --fail-on-violations`).
+(`lint --fail-on-errors`).
 
 ---
 

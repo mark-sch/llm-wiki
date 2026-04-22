@@ -459,7 +459,7 @@ def test_cli_sync_bad_vault_path_exits_with_error(tmp_path: Path, capsys):
     from llmwiki.cli import build_parser, cmd_sync
     parser = build_parser()
     args = parser.parse_args(
-        ["sync", "--vault", str(tmp_path / "does-not-exist"), "--dry-run"]
+        ["sync", "--vault", str(tmp_path / "does-not-exist")]
     )
     rc = cmd_sync(args)
     assert rc == 2

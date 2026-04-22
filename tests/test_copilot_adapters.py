@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from llmwiki.adapters import REGISTRY, discover_adapters
+from llmwiki.adapters import REGISTRY, discover_all
 from llmwiki.adapters.base import BaseAdapter
-from llmwiki.adapters.copilot_chat import CopilotChatAdapter
-from llmwiki.adapters.copilot_cli import CopilotCliAdapter
+from llmwiki.adapters.contrib.copilot_chat import CopilotChatAdapter
+from llmwiki.adapters.contrib.copilot_cli import CopilotCliAdapter
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -64,7 +64,7 @@ class TestCopilotChatContract:
         assert len(desc) > 0
 
     def test_registered_as_copilot_chat(self):
-        discover_adapters()
+        discover_all()
         assert "copilot-chat" in REGISTRY
         assert REGISTRY["copilot-chat"] is CopilotChatAdapter
 
@@ -268,7 +268,7 @@ class TestCopilotCliContract:
         assert len(desc) > 0
 
     def test_registered_as_copilot_cli(self):
-        discover_adapters()
+        discover_all()
         assert "copilot-cli" in REGISTRY
         assert REGISTRY["copilot-cli"] is CopilotCliAdapter
 
@@ -294,7 +294,7 @@ class TestCopilotCliCrossPlatform:
         custom.mkdir()
         monkeypatch.setenv("COPILOT_HOME", str(custom))
         # Re-import to pick up env var at build time
-        from llmwiki.adapters.copilot_cli import _build_default_roots
+        from llmwiki.adapters.contrib.copilot_cli import _build_default_roots
         roots = _build_default_roots()
         custom_roots = [r for r in roots if str(custom) in str(r)]
         assert len(custom_roots) >= 1
@@ -412,11 +412,11 @@ class TestCopilotCrossAdapter:
             assert isinstance(sessions, list)
 
     def test_both_in_registry(self):
-        discover_adapters()
+        discover_all()
         assert "copilot-chat" in REGISTRY
         assert "copilot-cli" in REGISTRY
 
     def test_names_set_by_register(self):
-        discover_adapters()
+        discover_all()
         assert CopilotChatAdapter.name == "copilot-chat"
         assert CopilotCliAdapter.name == "copilot-cli"

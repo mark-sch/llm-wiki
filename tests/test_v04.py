@@ -300,5 +300,5 @@ def test_cli_has_v04_subcommands():
 
     parser = build_parser()
     help_text = parser.format_help()
-    for cmd in ("check-links", "export", "manifest"):
+    for cmd in ("export",):
         assert cmd in help_text, f"missing v0.4 CLI subcommand: {cmd}"

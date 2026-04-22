@@ -109,7 +109,7 @@ Every page also includes an `<!-- llmwiki:metadata -->` HTML comment that AI age
 ### Quality & governance (v1.0)
 - **4-factor confidence scoring** — source count, source quality, recency, cross-references; with Ebbinghaus-inspired decay per content-type
 - **5-state lifecycle machine** — draft → reviewed → verified → stale → archived with 90-day auto-stale
-- **15 lint rules** — 8 structural (frontmatter, link integrity, orphans, freshness, duplicates, index sync…) + 3 LLM-powered (contradictions, claim verification, summary accuracy) + stale_candidates (#51) + cache_tier_consistency (#52) + tags_topics_convention (#302) + stale_reference_detection (#303)
+- **14 lint rules** — 8 structural (frontmatter, link integrity, orphans, freshness, duplicates, index sync…) + 3 LLM-powered (contradictions, claim verification, summary accuracy) + stale_candidates (#51) + tags_topics_convention (#302) + stale_reference_detection (#303)
 - **Auto Dream** — MEMORY.md consolidation after 24h + 5 sessions: resolve relative dates, prune outdated, 200-line cap
 - **9 navigation files** — CLAUDE.md, AGENTS.md, MEMORY.md, SOUL.md, CRITICAL_FACTS.md, hints.md, hot.md + per-project hot caches
 

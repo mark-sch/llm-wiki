@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from llmwiki.adapters.chatgpt import (
+from llmwiki.adapters.contrib.chatgpt import (
     ChatGPTAdapter,
     _linearize,
     _role,

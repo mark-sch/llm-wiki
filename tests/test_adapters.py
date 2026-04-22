@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from llmwiki.adapters import REGISTRY, discover_adapters
+from llmwiki.adapters import REGISTRY, discover_all
 from llmwiki.adapters.base import BaseAdapter
 from llmwiki.adapters.claude_code import ClaudeCodeAdapter
 from llmwiki.adapters.codex_cli import CodexCliAdapter
-from llmwiki.adapters.copilot_chat import CopilotChatAdapter
-from llmwiki.adapters.copilot_cli import CopilotCliAdapter
-from llmwiki.adapters.cursor import CursorAdapter
-from llmwiki.adapters.gemini_cli import GeminiCliAdapter
-from llmwiki.adapters.obsidian import ObsidianAdapter
-from llmwiki.adapters.pdf import PdfAdapter
+from llmwiki.adapters.contrib.copilot_chat import CopilotChatAdapter
+from llmwiki.adapters.contrib.copilot_cli import CopilotCliAdapter
+from llmwiki.adapters.contrib.cursor import CursorAdapter
+from llmwiki.adapters.contrib.gemini_cli import GeminiCliAdapter
+from llmwiki.adapters.contrib.obsidian import ObsidianAdapter
 
 
 def test_registry_discovers_all_adapters():
-    discover_adapters()
+    discover_all()
     assert "claude_code" in REGISTRY
     assert "codex_cli" in REGISTRY
     assert "copilot-chat" in REGISTRY
@@ -23,7 +22,6 @@ def test_registry_discovers_all_adapters():
     assert "cursor" in REGISTRY
     assert "gemini_cli" in REGISTRY
     assert "obsidian" in REGISTRY
-    assert "pdf" in REGISTRY
 
 
 def test_all_adapters_subclass_base():
@@ -34,17 +32,16 @@ def test_all_adapters_subclass_base():
     assert issubclass(CursorAdapter, BaseAdapter)
     assert issubclass(GeminiCliAdapter, BaseAdapter)
     assert issubclass(ObsidianAdapter, BaseAdapter)
-    assert issubclass(PdfAdapter, BaseAdapter)
 
 
 def test_all_adapters_have_name():
-    discover_adapters()
+    discover_all()
     for name, cls in REGISTRY.items():
         assert cls.name == name, f"adapter {cls.__name__} name mismatch"
 
 
 def test_all_adapters_have_description():
-    discover_adapters()
+    discover_all()
     for cls in REGISTRY.values():
         desc = cls.description()
         assert isinstance(desc, str)

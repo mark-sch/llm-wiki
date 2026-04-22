@@ -34,7 +34,7 @@ def test_adapters_lists_claude_code():
     assert r.returncode == 0
     assert "claude_code" in r.stdout
     assert "codex_cli" in r.stdout
-    assert "obsidian" in r.stdout
+    # obsidian moved to contrib — no longer in default `adapters` output
 
 
 def test_no_args_prints_help():
