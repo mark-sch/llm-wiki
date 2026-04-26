@@ -56,7 +56,10 @@ dependencies = [
 # highlight.js via CDN, so no Python-side highlighter dep is needed.
 highlight = []
 pdf = ["pypdf>=6.10.2"]
-graph = ["graphifyy>=0.4.20"]
+graph = [
+    "graphifyy>=0.4.20; python_version >= '3.10' and python_version < '3.14'",
+    "matplotlib>=3.9",
+]
 dev = [
     "pytest>=7.0",
     "ruff>=0.15.10",
@@ -74,7 +77,8 @@ e2e = [
 ]
 all = [
     "pypdf>=6.10.2",
-    "graphifyy>=0.4.20",
+    "graphifyy>=0.4.20; python_version >= '3.10' and python_version < '3.14'",
+    "matplotlib>=3.9",
 ]
 
 [project.urls]
@@ -120,3 +124,8 @@ python_functions = ["test_*"]
 # of the Playwright + pytest-bdd harness. Run E2E explicitly:
 #   pytest tests/e2e/ --no-header -p no:cacheprovider
 addopts = "-q --ignore=tests/e2e"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]

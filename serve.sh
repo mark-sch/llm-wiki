@@ -4,4 +4,9 @@
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-exec python3 -m llmwiki serve "$@"
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run python3 -m llmwiki serve "$@"
+else
+  exec python3 -m llmwiki serve "$@"
+fi

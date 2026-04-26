@@ -19,25 +19,32 @@ fi
 PY_VER=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 echo "    python: $PY_VER"
 
-# 2. Check for markdown package
-if ! python3 -c "import markdown" 2>/dev/null; then
-  echo "==> installing python 'markdown' (required)"
-  python3 -m pip install --user --quiet markdown 2>&1 | tail -2 || true
+# Prefer uv when available (handles deps via pyproject.toml)
+if command -v uv >/dev/null 2>&1; then
+  echo "    uv: $(uv --version)"
+  RUN="uv run python3 -m llmwiki"
+else
+  RUN="python3 -m llmwiki"
+  # 2. Check for markdown package (only needed without uv)
+  if ! python3 -c "import markdown" 2>/dev/null; then
+    echo "==> installing python 'markdown' (required)"
+    python3 -m pip install --user --quiet markdown 2>&1 | tail -2 || true
+  fi
 fi
 
 # 3. Syntax highlighting (v0.5): highlight.js loads from CDN at view time,
 #    so there is no longer an optional Python dep to install here.
 
 # 4. Scaffold raw/ wiki/ site/
-python3 -m llmwiki init
+$RUN init
 
 # 5. Show available adapters
-python3 -m llmwiki adapters
+$RUN adapters
 
 # 6. First sync (dry-run so users see what would happen)
 echo
 echo "==> dry-run of first sync:"
-python3 -m llmwiki sync --dry-run || true
+$RUN sync --dry-run || true
 
 echo
 echo "================================================================"
