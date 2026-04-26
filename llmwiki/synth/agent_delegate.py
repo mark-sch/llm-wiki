@@ -123,6 +123,7 @@ def _agent_runtime_detected() -> bool:
     * ``CLAUDE_CODE`` or ``CLAUDECODE`` — set by Claude Code sessions.
     * ``CODEX_CLI`` — set by Codex CLI.
     * ``CURSOR_AGENT`` — set by Cursor's chat pane.
+    * ``KIMI_CLI`` — set by Kimi CLI sessions.
 
     If none of the above are set, we consider the backend unavailable
     and return ``False`` so the pipeline falls back to dummy.
@@ -132,7 +133,7 @@ def _agent_runtime_detected() -> bool:
         return True
     if explicit in {"0", "false", "no", "off"}:
         return False
-    for env_var in ("CLAUDE_CODE", "CLAUDECODE", "CODEX_CLI", "CURSOR_AGENT"):
+    for env_var in ("CLAUDE_CODE", "CLAUDECODE", "CODEX_CLI", "CURSOR_AGENT", "KIMI_CLI"):
         if os.environ.get(env_var):
             return True
     return False

@@ -122,6 +122,33 @@ Browse to a session page; the body should be an actual summary, not
 the canned "Auto-synthesis — replace with actual quotes from the
 session" placeholder.
 
+## Alternative: OpenAI-compatible servers (llama-server, vLLM, etc.)
+
+If you run `llama-server` (llama.cpp), vLLM, or any other OpenAI-compatible
+server instead of Ollama, use the `openai` backend:
+
+```jsonc
+{
+  "synthesis": {
+    "backend": "openai",
+    "model": "llama3.1:8b",
+    "base_url": "http://127.0.0.1:8080/v1",
+    "api_key": "",
+    "timeout": 120,
+    "max_retries": 3
+  }
+}
+```
+
+- `base_url` is automatically normalized: `http://host:port` works as well as
+  `http://host:port/v1`.
+- `api_key` is optional — most local servers do not require authentication.
+- The backend calls `/v1/chat/completions` with a single `user` message
+  containing the full prompt.
+
+Verify with `llmwiki synthesize --check` — expect `Backend: OpenAISynthesizer`
+and `Available: True`.
+
 ## Troubleshooting
 
 ### `OllamaUnavailableError: connection refused`
