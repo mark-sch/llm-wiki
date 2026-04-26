@@ -80,6 +80,7 @@ dist-site/
 # the mirrors are regenerated locally and don't need to be committed.
 .codex/skills/
 .agents/skills/
+.kimi/skills/
 
 # Local config (user-specific).
 config.json
@@ -89,6 +90,7 @@ config.local.json
 
 # Logs
 *.log
+uv.log
 /tmp/llmwiki-*.log
 
 # ─── Python ───────────────────────────────────────────────────────────────
