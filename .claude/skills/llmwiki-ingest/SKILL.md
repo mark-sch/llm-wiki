@@ -19,12 +19,12 @@ Takes a source file (or a folder) and turns it into wiki pages following the Kar
 ## When to use
 
 - User says "ingest this file", "add this to the wiki", "process this into the wiki"
-- User runs the `/wiki-ingest` slash command
+- User says "ingest this" or "process this into the wiki"
 - User says "sync the wiki" — in that case, the `llmwiki-sync` skill runs the converter first, then invokes this skill for each new file
 
 ## Workflow
 
-Follow the **Ingest Workflow** from the repo's `CLAUDE.md` exactly:
+Follow the **Ingest Workflow** from the repo's `AGENTS.md` (or `CLAUDE.md`) exactly:
 
 1. Read the source file(s) with the Read tool
 2. Read `wiki/index.md` and `wiki/overview.md` for context

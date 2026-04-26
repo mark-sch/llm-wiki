@@ -23,7 +23,7 @@ Do NOT invoke for questions that can be answered without the user's personal kno
 
 ## Workflow
 
-Follow the **Query Workflow** from the repo's `CLAUDE.md`:
+Follow the **Query Workflow** from the repo's `AGENTS.md` (or `CLAUDE.md`):
 
 1. **Locate the llmwiki install** (see `llmwiki-sync` skill for the fallback search order).
 
@@ -41,7 +41,7 @@ Follow the **Query Workflow** from the repo's `CLAUDE.md`:
    ```markdown
    Would you like me to save this as wiki/syntheses/<slug>.md for future reference?
    ```
-   If yes, write it using the Synthesis Page Format from CLAUDE.md.
+   If yes, write it using the Synthesis Page Format from AGENTS.md (or CLAUDE.md).
 
 8. **Append to `wiki/log.md`**:
    ```
