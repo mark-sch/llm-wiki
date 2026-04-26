@@ -21,6 +21,8 @@ def test_is_available_returns_bool():
 
 def test_is_available_true_when_graphify_installed():
     """graphifyy is installed in our dev environment."""
+    if not is_available():
+        pytest.skip("graphifyy not installed (install with: uv pip install -e '.[graph]')")
     assert is_available() is True
 
 

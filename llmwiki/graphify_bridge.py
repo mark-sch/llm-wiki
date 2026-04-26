@@ -335,7 +335,11 @@ def build_graphify_graph(
 
     # SVG export
     from graphify.export import to_svg, to_graphml
-    to_svg(G, communities, str(svg_path), community_labels=labels)
+    try:
+        to_svg(G, communities, str(svg_path), community_labels=labels)
+    except Exception as e:
+        print(f"  graphify: SVG export skipped ({e})", file=sys.stderr)
+        print("  graphify: install scipy for SVG export: uv pip install scipy", file=sys.stderr)
 
     # GraphML — flatten list attributes to strings first (GraphML only supports scalars)
     try:
