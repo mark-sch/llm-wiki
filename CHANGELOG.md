@@ -11,6 +11,8 @@ Versions below 1.0 are pre-production — API and file formats may change.
 ### Added
 
 - **Graphify integration** (#364) — `pip install llmwiki[graph]` adds `graphifyy` as optional dependency. New `graphify_bridge.py` module provides AI-powered knowledge graph building via tree-sitter AST extraction, Leiden community detection, and confidence-scored edges. Run with `llmwiki graph --engine graphify`.
+- **Kimi CLI adapter** — new contrib adapter `llmwiki.adapters.kimi_cli` reads `~/.kimi/sessions/<md5(work_dir)>/<uuid>/context.jsonl`, normalises Kimi's role-based schema into Claude-style records, and resolves project slugs via `~/.kimi/kimi.json`. Ships with fixture, snapshot test, and documentation at `docs/adapters/kimi_cli.md`.
+- **i18n support: German synthesis prompts, seeded wiki pages, and configurable HTML output language** — `llmwiki init --language de` seeds German translations for all built-in wiki pages (SOUL.md, CRITICAL_FACTS.md, etc.) and the synthesis prompt. `config.json` gains a top-level `"language"` field (`en` | `de`). The `build` and `graph` commands emit `<html lang="de">` and `<meta itemprop="inLanguage" content="de">` when configured. All i18n resources live under `llmwiki/i18n/` and are versioned with the package.
 
 ### Changed
 
