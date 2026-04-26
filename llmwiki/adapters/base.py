@@ -95,7 +95,11 @@ class BaseAdapter:
         """Default: filenames or paths containing 'subagent' are sub-agent runs."""
         return "subagent" in jsonl_path.parts or "subagent" in jsonl_path.name
 
-    def normalize_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def normalize_records(
+        self,
+        records: list[dict[str, Any]],
+        jsonl_path: Path | None = None,
+    ) -> list[dict[str, Any]]:
         """Normalize agent-specific JSONL records into the shared Claude-style
         format that ``llmwiki.convert`` expects.
 
@@ -107,6 +111,9 @@ class BaseAdapter:
         sessions already use this format. Adapters for agents with a different
         schema (e.g. Codex CLI, Copilot) override this method to translate
         their native records into the shared shape.
+
+        ``jsonl_path`` is passed so adapters can extract file metadata (mtime,
+        filename) when the native format does not carry timestamps or slugs.
 
         Called by ``convert.py`` after ``parse_jsonl()`` and before the
         renderer, so the normalization is transparent to the rest of the

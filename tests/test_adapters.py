@@ -10,6 +10,7 @@ from llmwiki.adapters.contrib.copilot_chat import CopilotChatAdapter
 from llmwiki.adapters.contrib.copilot_cli import CopilotCliAdapter
 from llmwiki.adapters.contrib.cursor import CursorAdapter
 from llmwiki.adapters.contrib.gemini_cli import GeminiCliAdapter
+from llmwiki.adapters.contrib.kimi_cli import KimiCliAdapter
 from llmwiki.adapters.contrib.obsidian import ObsidianAdapter
 
 
@@ -21,6 +22,7 @@ def test_registry_discovers_all_adapters():
     assert "copilot-cli" in REGISTRY
     assert "cursor" in REGISTRY
     assert "gemini_cli" in REGISTRY
+    assert "kimi_cli" in REGISTRY
     assert "obsidian" in REGISTRY
 
 
@@ -31,6 +33,7 @@ def test_all_adapters_subclass_base():
     assert issubclass(CopilotCliAdapter, BaseAdapter)
     assert issubclass(CursorAdapter, BaseAdapter)
     assert issubclass(GeminiCliAdapter, BaseAdapter)
+    assert issubclass(KimiCliAdapter, BaseAdapter)
     assert issubclass(ObsidianAdapter, BaseAdapter)
 
 

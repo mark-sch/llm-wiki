@@ -104,7 +104,11 @@ class CodexCliAdapter(BaseAdapter):
         return path.parent.name
 
 
-    def normalize_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def normalize_records(
+        self,
+        records: list[dict[str, Any]],
+        jsonl_path: Path | None = None,
+    ) -> list[dict[str, Any]]:
         """Normalize Codex CLI records into the shared Claude-style format.
 
         Maps:

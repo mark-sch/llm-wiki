@@ -33,9 +33,10 @@ Different agents write their transcripts to different locations. The adapter reg
 | Agent | Session store | Adapter |
 |---|---|---|
 | Claude Code | `~/.claude/projects/<project>/<uuid>.jsonl` | `claude_code.py` |
-| Codex CLI | `~/.codex/sessions/` | `codex_cli.py` (stub in v0.1) |
+| Codex CLI | `~/.codex/sessions/` | `codex_cli.py` |
 | Gemini CLI | `~/.gemini/` (TBD) | `gemini_cli.py` (planned) |
-| OpenCode | `~/.opencode/` (TBD) | `opencode.py` (planned) |
+| Kimi CLI | `~/.kimi/sessions/<md5(work_dir)>/<uuid>/context.jsonl` | `kimi_cli.py` |
+| OpenCode | `~/.opencode/sessions/` | `opencode.py` |
 
 The CLI auto-detects which adapter(s) to run. Override with `--adapter <name>`.
 
@@ -47,7 +48,8 @@ Run from inside the repo:
 python3 -m llmwiki sync           # convert new .jsonl → raw/sessions/*.md
 python3 -m llmwiki build          # compile site/ from raw/ + wiki/
 python3 -m llmwiki serve          # local HTTP server on 127.0.0.1:8765
-python3 -m llmwiki init           # scaffold raw/, wiki/, site/ directories
+python3 -m llmwiki init [--language de]  # scaffold raw/, wiki/, site/ directories
+python3 -m llmwiki install-skills # copy skills into .kimi/skills, .codex/skills, .agents/skills
 ```
 
 Or use the one-click scripts: `./sync.sh`, `./build.sh`, `./serve.sh` (macOS/Linux); `sync.bat`, `build.bat`, `serve.bat` (Windows).
@@ -203,6 +205,23 @@ Every entity page should declare `entity_type` in frontmatter:
 
 - `confidence: 0.85` — 4-factor score (source count, quality, recency, cross-refs)
 - `lifecycle: draft` — one of: draft, reviewed, verified, stale, archived
+
+## Multi-agent skills
+
+llmwiki ships with agent-agnostic skills that work in Claude Code, Kimi CLI, Codex CLI, and any other agent that loads `.claude/skills/` or `.kimi/skills/`.
+
+After cloning or updating the repo, synchronise skills into all agent directories:
+
+```bash
+python3 -m llmwiki install-skills
+```
+
+This copies the canonical skills from `.claude/skills/` into:
+- `.kimi/skills/` — Kimi CLI
+- `.codex/skills/` — Codex CLI
+- `.agents/skills/` — Universal / future agents
+
+Skills are written agent-agnostically: they reference `AGENTS.md` (not `CLAUDE.md`) and use `python3 -m llmwiki <command>` instead of agent-specific binaries.
 
 ## Hard rules
 

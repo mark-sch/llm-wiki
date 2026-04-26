@@ -49,6 +49,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "assistant_text_chars": 8000,
     },
     "drop_thinking_blocks": True,
+    "language": "en",
 }
 
 
@@ -979,6 +980,9 @@ def convert_all(
     discover_adapters()
     selected: list[type] = []
     if adapters:
+        # Attempt to load any contrib adapters that were explicitly requested.
+        from llmwiki.adapters import discover_contrib
+        discover_contrib(names=adapters)
         for name in adapters:
             if name not in REGISTRY:
                 print(f"error: unknown adapter {name!r}. Try: {', '.join(REGISTRY)}", file=sys.stderr)
@@ -1124,7 +1128,7 @@ def convert_all(
             # Claude-style format before filtering/rendering. This lets each
             # adapter translate its native schema without touching the shared
             # renderer. The default implementation is a no-op for Claude Code.
-            records = adapter.normalize_records(records)
+            records = adapter.normalize_records(records, jsonl_path=path)
             records = filter_records(records, drop_types)
             if not records:
                 filtered += 1

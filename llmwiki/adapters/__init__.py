@@ -45,6 +45,7 @@ def discover_adapters() -> None:
     """Import core adapters so they register themselves."""
     from llmwiki.adapters import claude_code  # noqa: F401
     from llmwiki.adapters import codex_cli  # noqa: F401
+    from llmwiki.adapters.contrib import kimi_cli  # noqa: F401
 
 
 def discover_contrib(names: list[str] | None = None) -> None:

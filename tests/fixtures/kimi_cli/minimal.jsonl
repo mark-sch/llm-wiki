@@ -1,0 +1,12 @@
+{"role":"_system_prompt","content":"You are Kimi Code CLI, an interactive general AI agent."}
+{"role":"_checkpoint","id":0}
+{"role":"user","content":"hello, say hi and list files"}
+{"role":"_checkpoint","id":1}
+{"role":"_usage","token_count":12}
+{"role":"assistant","content":[],"tool_calls":[{"type":"function","id":"Bash:0","function":{"name":"Bash","arguments":"{\"command\":\"ls\"}"}}]}
+{"role":"_usage","token_count":18}
+{"role":"tool","content":[{"type":"text","text":"main.py\nREADME.md"}],"tool_call_id":"Bash:0"}
+{"role":"_checkpoint","id":2}
+{"role":"_usage","token_count":8}
+{"role":"assistant","content":"Hi! You have main.py and README.md in this directory."}
+{"role":"_usage","token_count":14}

@@ -1,6 +1,6 @@
 # llmwiki
 
-> **LLM-powered knowledge base from your Claude Code, Codex CLI, Cursor, Gemini CLI, and Obsidian sessions.**
+> **LLM-powered knowledge base from your Claude Code, Codex CLI, Cursor, Gemini CLI, Kimi CLI, and Obsidian sessions.**
 > Built on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
 ## 👉 Live demo: **[pratiyush.github.io/llm-wiki](https://pratiyush.github.io/llm-wiki/)**
@@ -20,11 +20,12 @@ Rebuilt on every `master` push from the synthetic sessions in [`examples/demo-se
 [![Works with Copilot](https://img.shields.io/badge/GitHub%20Copilot-✓-7C3AED.svg)](https://github.com/features/copilot)
 [![Works with Cursor](https://img.shields.io/badge/Cursor-✓-7C3AED.svg)](https://cursor.com)
 [![Works with Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-✓-7C3AED.svg)](https://ai.google.dev/gemini-api)
+[![Works with Kimi CLI](https://img.shields.io/badge/Kimi%20CLI-✓-7C3AED.svg)](https://www.moonshot.cn/)
 [![Works with Obsidian](https://img.shields.io/badge/Obsidian-✓-7C3AED.svg)](https://obsidian.md)
 
 ---
 
-Every Claude Code, Codex CLI, Copilot, Cursor, and Gemini CLI session writes a full transcript to disk. You already have hundreds of them and never look at them again.
+Every Claude Code, Codex CLI, Copilot, Cursor, Gemini CLI, and Kimi CLI session writes a full transcript to disk. You already have hundreds of them and never look at them again.
 
 **llmwiki** turns that dormant history into a beautiful, searchable, interlinked knowledge base — locally, in two commands. Plus, it produces AI-consumable exports (`llms.txt`, `llms-full.txt`, JSON-LD graph, per-page `.txt` + `.json` siblings) so other AI agents can query your wiki directly.
 
@@ -372,6 +373,7 @@ Each subcommand has its own `--help`. All commands are also wrapped in one-click
 | [Codex CLI](https://github.com/openai/codex) | `llmwiki.adapters.codex_cli` | ✅ Production | v0.3 |
 | [Cursor](https://cursor.com) | `llmwiki.adapters.cursor` | ✅ Production | v0.5 |
 | [Gemini CLI](https://ai.google.dev/gemini-api) | `llmwiki.adapters.gemini_cli` | ✅ Production | v0.5 |
+| [Kimi CLI](https://www.moonshot.cn/) | `llmwiki.adapters.kimi_cli` | ✅ Production | v1.1 |
 | PDF files | `llmwiki.adapters.pdf` | ✅ Production | v0.5 |
 | [Copilot Chat](https://github.com/features/copilot) | `llmwiki.adapters.copilot_chat` | ✅ Production | v0.9 |
 | [Copilot CLI](https://github.com/features/copilot) | `llmwiki.adapters.copilot_cli` | ✅ Production | v0.9 |

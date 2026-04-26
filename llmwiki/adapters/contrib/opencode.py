@@ -101,7 +101,9 @@ class OpenCodeAdapter(BaseAdapter):
         return "subagent" in jsonl_path.name
 
     def normalize_records(
-        self, records: list[dict[str, Any]]
+        self,
+        records: list[dict[str, Any]],
+        jsonl_path: Path | None = None,
     ) -> list[dict[str, Any]]:
         """Translate OpenCode/OpenClaw records into the shared Claude-style
         shape that ``llmwiki.convert.render_session_markdown`` expects.
