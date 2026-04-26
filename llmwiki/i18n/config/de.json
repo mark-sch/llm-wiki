@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy this file to ./config.json (gitignored) and edit to your taste.",
+  "_comment": "Kopiere diese Datei nach ./config.json (gitignored) und passe sie an deine Bedürfnisse an.",
 
   "filters": {
     "live_session_minutes": 60,
@@ -13,9 +13,9 @@
   },
 
   "redaction": {
-    "_comment": "Set real_username to the part of your home path to replace. Auto-detected from $USER if empty.",
+    "_comment": "Setze real_username auf den Teil deines Home-Pfads, der ersetzt werden soll. Wird leer gelassen, automatisch aus $USER erkannt.",
     "real_username": "",
-    "replacement_username": "USER",
+    "replacement_username": "BENUTZER",
     "extra_patterns": [
       "(?i)(api[_-]?key|secret|token|bearer|password)[\"'\\s:=]+[\\w\\-\\.]{8,}",
       "sk-[A-Za-z0-9]{20,}",
@@ -33,13 +33,13 @@
 
   "drop_thinking_blocks": true,
 
-  "_schedule_comment": "Controls when wiki-build and wiki-lint run. Values: on-sync (after every sync), daily, weekly, manual, never.",
+  "_schedule_comment": "Steuert, wann wiki-build und wiki-lint ausgeführt werden. Werte: on-sync (nach jedem Sync), daily, weekly, manual, never.",
   "schedule": {
     "build": "on-sync",
     "lint": "manual"
   },
 
-  "_vault_comment": "Default vault path for --vault flag. Set to your Obsidian/Logseq vault. Empty = must pass --vault explicitly.",
+  "_vault_comment": "Standard-Pfad für --vault. Setze auf deinen Obsidian/Logseq-Vault. Leer = --vault muss explizit übergeben werden.",
   "vault": {
     "default_path": "",
     "layout": {
@@ -52,40 +52,40 @@
     "allow_overwrite": false
   },
 
-  "_graph_comment": "Default graph engine. builtin = stdlib wikilink graph (zero deps). graphify = AI-powered (requires pip install llmwiki[graph]).",
+  "_graph_comment": "Standard-Graph-Engine. builtin = stdlib wikilink graph (keine Abhängigkeiten). graphify = KI-gestützt (erfordert pip install llmwiki[graph]).",
   "graph": {
     "default_engine": "builtin",
     "format": "both"
   },
 
-  "_serve_comment": "Default serve settings.",
+  "_serve_comment": "Standard-Einstellungen für den lokalen Server.",
   "serve": {
     "port": 8765,
     "host": "127.0.0.1",
     "open_browser": false
   },
 
-  "_build_comment": "Default build settings.",
+  "_build_comment": "Standard-Einstellungen für den Build.",
   "build": {
     "out_dir": "site",
     "search_mode": "auto",
     "synthesize": false
   },
 
-  "_adapters_comment": "Contrib adapters. All disabled by default — enable with: llmwiki sync --adapter <name>",
+  "_adapters_comment": "Contrib-Adapter. Alle standardmäßig deaktiviert — aktivieren mit: llmwiki sync --adapter <name>",
 
   "web_clipper": {
     "enabled": false,
-    "_comment": "Obsidian Web Clipper intake path.",
+    "_comment": "Pfad für Obsidian Web Clipper Intake.",
     "watch_dir": "raw/web",
     "extensions": [".md"],
     "auto_queue": true
   },
 
-  "_language_comment": "Output language for synthesis prompts, seeded wiki pages, and HTML lang attribute. Supported: en, de.",
-  "language": "en",
+  "_language_comment": "Ausgabesprache für Synthesis-Prompts, geseedete Wiki-Seiten und HTML-lang-Attribute. Unterstützt: en, de.",
+  "language": "de",
 
-  "_synthesis_comment": "LLM backend for auto-synthesizing wiki source pages. backend=dummy (default, offline) | ollama (native Ollama API) | openai (OpenAI-compatible API, e.g. llama-server, vLLM). Run `llmwiki synthesize --check` to probe the server.",
+  "_synthesis_comment": "LLM-Backend für automatisches Synthetisieren von Wiki-Quellseiten. backend=dummy (Standard, offline) | ollama (native Ollama API) | openai (OpenAI-kompatible API, z.B. llama-server, vLLM). Führe `llmwiki synthesize --check` aus, um den Server zu prüfen.",
   "synthesis": {
     "backend": "dummy",
     "model": "llama3.1:8b",

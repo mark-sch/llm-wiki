@@ -33,8 +33,26 @@ def cmd_version(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install_skills(args: argparse.Namespace) -> int:
+    """Install llmwiki skills into all agent target directories."""
+    from llmwiki.skill_installer import install_all, list_installed
+
+    print("Installing llmwiki skills …")
+    count = install_all()
+    print(f"  Installed to {count} target directories.")
+
+    print("\nInstalled skills by target:")
+    for target, skills in list_installed().items():
+        status = ", ".join(skills) if skills else "(none yet)"
+        print(f"  {target}: {status}")
+
+    return 0
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     """Create raw/, wiki/, site/ directory structure."""
+    from llmwiki.i18n import load_seed
+
     for name in ("raw/sessions", "wiki/sources", "wiki/entities", "wiki/concepts", "wiki/syntheses", "site"):
         p = REPO_ROOT / name
         p.mkdir(parents=True, exist_ok=True)
@@ -50,16 +68,45 @@ def cmd_init(args: argparse.Namespace) -> int:
     if not keep.exists():
         keep.touch()
 
+    # Create wiki/prompts/ so users can drop overrides there
+    prompts_dir = REPO_ROOT / "wiki" / "prompts"
+    prompts_dir.mkdir(parents=True, exist_ok=True)
+
+    lang = getattr(args, "language", "en")
+
+    # Seed config.json from i18n template + selected language
+    config_path = REPO_ROOT / "config.json"
+    if not config_path.exists():
+        import json as _json
+        from llmwiki.i18n import load_config_template
+        try:
+            cfg = _json.loads(load_config_template(lang))
+        except (FileNotFoundError, _json.JSONDecodeError):
+            # Minimal default config when template is missing (e.g. tests)
+            cfg = {"language": lang}
+        cfg["language"] = lang
+        config_path.write_text(_json.dumps(cfg, indent=2, sort_keys=False), encoding="utf-8")
+        print(f"  seeded config.json (language={lang})")
+
+    # Copy non-English prompt template so it can be committed per-project
+    if lang != "en":
+        from llmwiki.i18n import load_prompt_template
+        prompt_text = load_prompt_template(args.language)
+        project_prompt = prompts_dir / "source_page.md"
+        if not project_prompt.exists():
+            project_prompt.write_text(prompt_text, encoding="utf-8")
+            print(f"  seeded wiki/prompts/source_page.md ({lang})")
+
     # Seed index/log/overview + navigation files if not present
-    seeds = {
-        "wiki/index.md": "# Wiki Index\n\n## Overview\n- [Overview](overview.md)\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Syntheses\n",
-        "wiki/overview.md": '---\ntitle: "Overview"\ntype: synthesis\nsources: []\nlast_updated: ""\n---\n\n# Overview\n\n*This page is maintained by your coding agent.*\n',
-        "wiki/log.md": "# Wiki Log\n\nAppend-only chronological record of all operations.\n\nFormat: `## [YYYY-MM-DD] <operation> | <title>`\n\n---\n",
-        "wiki/hints.md": '---\ntitle: "Navigation Hints"\ntype: navigation\nlast_updated: ""\n---\n\n# Hints\n\nWriting conventions, entity naming rules, and navigation guidance.\nCustomize this file for your project.\n',
-        "wiki/hot.md": '---\ntitle: "Hot Cache"\ntype: navigation\nlast_updated: ""\nauto_maintained: true\n---\n\n# Hot Cache\n\n*Auto-maintained. Last 10 session summaries.*\n',
-        "wiki/MEMORY.md": '---\ntitle: "Cross-Session Memory"\ntype: navigation\nlast_updated: ""\nmax_lines: 200\n---\n\n# MEMORY\n\n*200-line cap. Auto-consolidated by Auto Dream.*\n\n## User\n\n## Feedback\n\n## Project\n\n## Reference\n',
-        "wiki/SOUL.md": '---\ntitle: "Wiki Identity"\ntype: navigation\nlast_updated: ""\n---\n\n# SOUL\n\nThis wiki compiles raw session transcripts into structured, interlinked pages.\nCustomize this file to set your wiki\'s voice and purpose.\n',
-        "wiki/CRITICAL_FACTS.md": '---\ntitle: "Critical Facts"\ntype: navigation\nlast_updated: ""\n---\n\n# Critical Facts\n\n- raw/ is immutable — never modify files under raw/\n- Wiki uses [[wikilinks]] for cross-references\n- Confidence: 0.0-1.0, 4-factor formula\n- Lifecycle: draft > reviewed > verified > stale > archived\n',
+    seed_map = {
+        "wiki/index.md": "index.md",
+        "wiki/overview.md": "overview.md",
+        "wiki/log.md": "log.md",
+        "wiki/hints.md": "hints.md",
+        "wiki/hot.md": "hot.md",
+        "wiki/MEMORY.md": "MEMORY.md",
+        "wiki/SOUL.md": "SOUL.md",
+        "wiki/CRITICAL_FACTS.md": "CRITICAL_FACTS.md",
     }
 
     # v1.0 (#153): seed dashboard.md from examples/wiki_dashboard.md template
@@ -71,10 +118,10 @@ def cmd_init(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
         print(f"  seeded wiki/dashboard.md")
-    for rel, content in seeds.items():
+    for rel, seed_name in seed_map.items():
         p = REPO_ROOT / rel
         if not p.exists():
-            p.write_text(content, encoding="utf-8")
+            p.write_text(load_seed(seed_name, lang), encoding="utf-8")
             print(f"  seeded {p.relative_to(REPO_ROOT)}")
     return 0
 
@@ -106,6 +153,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         project=args.project,
         include_current=args.include_current,
         force=args.force,
+        dry_run=args.dry_run,
     )
 
     # v1.0 (#157): auto-build and auto-lint after sync.
@@ -128,11 +176,18 @@ def cmd_sync(args: argparse.Namespace) -> int:
     return rc
 
 
+def _resolve_config_path() -> Path:
+    """Return the active config path: prefers ./config.json, falls back to the example file."""
+    user_cfg = REPO_ROOT / "config.json"
+    if user_cfg.is_file():
+        return user_cfg
+    return REPO_ROOT / "examples" / "sessions_config.json"
+
+
 def _load_schedule_config() -> dict[str, str]:
-    """Load build/lint schedule config from sessions_config.json."""
+    """Load build/lint schedule config from the active config file."""
     import json as _json
-    from llmwiki import REPO_ROOT
-    config_path = REPO_ROOT / "examples" / "sessions_config.json"
+    config_path = _resolve_config_path()
     if not config_path.is_file():
         return {"build": "on-sync", "lint": "manual"}
     try:
@@ -171,11 +226,23 @@ def cmd_build(args: argparse.Namespace) -> int:
             return 2
         print(f"==> {describe_vault(vault)}")
 
+    # i18n: resolve language from config
+    config: dict = {}
+    config_path = _resolve_config_path()
+    if config_path.is_file():
+        try:
+            import json as _json
+            config = _json.loads(config_path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            pass
+    lang = config.get("language", "en")
+
     return build_site(
         out_dir=args.out,
         synthesize=args.synthesize,
         claude_path=args.claude,
         search_mode=args.search_mode,
+        lang=lang,
     )
 
 
@@ -246,7 +313,7 @@ def cmd_adapters(args: argparse.Namespace) -> int:
         return 0
 
     # Load user config to show enable/disable state
-    config_path = REPO_ROOT / "examples" / "sessions_config.json"
+    config_path = _resolve_config_path()
     config: dict = {}
     if config_path.is_file():
         try:
@@ -311,6 +378,17 @@ def cmd_query(args: argparse.Namespace) -> int:
 
 def cmd_graph(args: argparse.Namespace) -> int:
     """Build the knowledge graph from wiki/ wikilinks."""
+    # i18n: resolve language from config
+    config: dict = {}
+    config_path = _resolve_config_path()
+    if config_path.is_file():
+        try:
+            import json as _json
+            config = _json.loads(config_path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            pass
+    lang = config.get("language", "en")
+
     engine = getattr(args, "engine", "graphify")
     if engine == "graphify":
         from llmwiki.graphify_bridge import is_available, build_graphify_graph
@@ -325,7 +403,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
     from llmwiki.graph import build_and_report
     write_json = args.format in ("json", "both")
     write_html = args.format in ("html", "both")
-    return build_and_report(write_json_flag=write_json, write_html_flag=write_html)
+    return build_and_report(write_json_flag=write_json, write_html_flag=write_html, lang=lang)
 
 
 def cmd_sync_status(args: argparse.Namespace) -> int:
@@ -442,7 +520,13 @@ def cmd_export(args: argparse.Namespace) -> int:
         write_marp,
         export_all,
     )
-    from llmwiki.build import discover_sources, group_by_project, RAW_SESSIONS
+    from llmwiki.build import (
+        discover_sources,
+        group_by_project,
+        RAW_SESSIONS,
+        _build_wiki_sources_index,
+        _merge_wiki_sources,
+    )
 
     out_dir = args.out if args.out else REPO_ROOT / "site"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -451,6 +535,12 @@ def cmd_export(args: argparse.Namespace) -> int:
     if not sources:
         print("error: no sources found. Run 'llmwiki sync' first.", file=_sys.stderr)
         return 2
+
+    wiki_index = _build_wiki_sources_index()
+    if wiki_index:
+        sources = _merge_wiki_sources(sources, wiki_index)
+        print(f"  merged {len(wiki_index)} synthesized wiki sources into exports")
+
     groups = group_by_project(sources)
 
     format_ = args.format
@@ -547,7 +637,7 @@ def cmd_synthesize(args: argparse.Namespace) -> int:
     from llmwiki.synth.pipeline import resolve_backend, synthesize_new_sessions
 
     config: dict = {}
-    config_path = REPO_ROOT / "examples" / "sessions_config.json"
+    config_path = _resolve_config_path()
     if config_path.is_file():
         try:
             config = _json.loads(config_path.read_text(encoding="utf-8"))
@@ -582,6 +672,7 @@ def cmd_synthesize(args: argparse.Namespace) -> int:
     summary = synthesize_new_sessions(
         backend=backend,
         force=args.force,
+        config=config,
     )
     print(
         f"Scanned {summary['total_scanned']}, new {summary['new_files']}, "
@@ -904,7 +995,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     # init
     init = sub.add_parser("init", help="Scaffold raw/, wiki/, site/ directories")
+    init.add_argument(
+        "--language", choices=["en", "de"], default="en",
+        help="Wiki language. Seeds translated files and sets config.json language (default: en)",
+    )
     init.set_defaults(func=cmd_init)
+
+    # install-skills (#160 — multi-agent skill installer)
+    inst = sub.add_parser("install-skills", help="Copy skills into agent directories (.kimi/skills, .codex/skills, .agents/skills)")
+    inst.set_defaults(func=cmd_install_skills)
 
     # sync
     sync = sub.add_parser("sync", help="Convert new .jsonl sessions to markdown")
@@ -939,6 +1038,10 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument(
         "--recent", type=int, default=0,
         help="With --status: also show last N recent log entries.",
+    )
+    sync.add_argument(
+        "--dry-run", action="store_true",
+        help="Don't write, just report what would happen",
     )
     sync.set_defaults(func=cmd_sync)
 

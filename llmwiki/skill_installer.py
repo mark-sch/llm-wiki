@@ -8,6 +8,7 @@ Target directories (created if missing):
   - ``.claude/skills/``  (Claude Code, already exists in the repo)
   - ``.codex/skills/``   (Codex CLI)
   - ``.agents/skills/``  (universal standard proposed in issue #31005)
+  - ``.kimi/skills/``    (Kimi CLI)
 
 Strategy: copy-once from the canonical ``.claude/skills/`` into the
 other two locations, preserving the SKILL.md files. A future sync
@@ -37,6 +38,7 @@ CANONICAL_SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
 AGENT_TARGETS: list[str] = [
     ".codex/skills",
     ".agents/skills",
+    ".kimi/skills",
 ]
 
 

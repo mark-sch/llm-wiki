@@ -353,7 +353,8 @@ python3 -m llmwiki synthesize                    # real run
 | `--estimate` | Print cached-vs-fresh token + dollar estimate (#50). |
 
 Backend is picked from `synthesis.backend` in `sessions_config.json`
-(`dummy` by default, `ollama` for local, future `anthropic`). See
+(`dummy` by default, `ollama` for native Ollama API, `openai` for
+OpenAI-compatible servers such as llama-server or vLLM). See
 [`reference/prompt-caching.md`](prompt-caching.md).
 
 ### Auto-tagging (#351)
@@ -378,6 +379,40 @@ No extra API round-trip — rides the existing synthesis call, so cost
 estimates from `--estimate` are unchanged.  If the backend returns no
 suggested-tags block (dummy backend, malformed output), the page still
 ships with baseline tags.
+
+---
+
+## `install-skills` — copy skills into agent directories
+
+Copies the canonical skills from `.claude/skills/` into every supported agent target directory so that all agents (Kimi CLI, Codex CLI, etc.) can load them.
+
+```bash
+python3 -m llmwiki install-skills
+```
+
+**Flags:** none.
+
+**What it does:**
+
+| Target directory | Agent |
+|---|---|
+| `.kimi/skills/` | Kimi CLI |
+| `.codex/skills/` | Codex CLI |
+| `.agents/skills/` | Universal / future agents |
+
+Run this after updating the repo (e.g. `git pull`) or after editing skills in `.claude/skills/`, to keep all agent targets in sync.
+
+**Expected output:**
+
+```
+Installing llmwiki skills …
+  Installed to 18 target directories.
+
+Installed skills by target:
+  /path/to/repo/.codex/skills: llmwiki-ingest, llmwiki-query, llmwiki-sync, ...
+  /path/to/repo/.agents/skills: llmwiki-ingest, llmwiki-query, llmwiki-sync, ...
+  /path/to/repo/.kimi/skills: llmwiki-ingest, llmwiki-query, llmwiki-sync, ...
+```
 
 ---
 

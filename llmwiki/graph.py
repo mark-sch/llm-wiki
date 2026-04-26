@@ -757,7 +757,7 @@ function escapeHtml(s) {
 """
 
 
-def write_html(graph: dict[str, Any], out_path: Path) -> None:
+def write_html(graph: dict[str, Any], out_path: Path, lang: str = "en") -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # json.dumps with ensure_ascii=False keeps unicode labels readable in
     # source view. Embedding the JSON directly in a ``<script>`` block is
@@ -769,6 +769,8 @@ def write_html(graph: dict[str, Any], out_path: Path) -> None:
         # `</script>` would otherwise close our block early. Escape it.
         payload = payload.replace("</script>", "<\\/script>")
     html = HTML_TEMPLATE.replace("__GRAPH_JSON__", payload)
+    if lang != "en":
+        html = html.replace('<html lang="en"', f'<html lang="{html.escape(lang)}"')
     out_path.write_text(html, encoding="utf-8")
 
 
@@ -792,7 +794,7 @@ def copy_to_site(site_dir: Path, *, graph: Optional[dict[str, Any]] = None) -> O
     return out
 
 
-def build_and_report(write_json_flag: bool = True, write_html_flag: bool = True) -> int:
+def build_and_report(write_json_flag: bool = True, write_html_flag: bool = True, lang: str = "en") -> int:
     graph = build_graph()
     if not graph["nodes"]:
         print(f"warning: no wiki pages found under {WIKI_DIR}", file=sys.stderr)
@@ -805,7 +807,7 @@ def build_and_report(write_json_flag: bool = True, write_html_flag: bool = True)
 
     if write_html_flag:
         html_path = GRAPH_DIR / "graph.html"
-        write_html(graph, html_path)
+        write_html(graph, html_path, lang=lang)
         print(f"  wrote {html_path.relative_to(REPO_ROOT)}")
 
     stats = graph["stats"]

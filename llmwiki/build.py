@@ -128,6 +128,86 @@ def discover_sources(root: Path) -> list[tuple[Path, dict[str, Any], str]]:
     return out
 
 
+def _build_wiki_sources_index() -> dict[str, tuple[Path, dict[str, Any], str]]:
+    """Index synthesized wiki pages under wiki/sources/ by their source_file.
+
+    Returns a dict mapping ``source_file`` (relative path like
+    ``raw/sessions/proj/2026-04-01-slug.md``) to ``(wiki_path, wiki_meta,
+    wiki_body)``.
+    """
+    index: dict[str, tuple[Path, dict[str, Any], str]] = {}
+    wiki_sources = REPO_ROOT / "wiki" / "sources"
+    if not wiki_sources.exists():
+        return index
+    for p in sorted(wiki_sources.rglob("*.md")):
+        if is_context_file(p):
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        meta, body = parse_frontmatter(text)
+        source_file = meta.get("source_file")
+        if source_file:
+            index[str(source_file)] = (p, meta, body)
+    return index
+
+
+def _merge_wiki_sources(
+    sources: list[tuple[Path, dict[str, Any], str]],
+    wiki_index: dict[str, tuple[Path, dict[str, Any], str]],
+) -> list[tuple[Path, dict[str, Any], str]]:
+    """Merge synthesized wiki/sources/ content into raw sources.
+
+    For each raw source, if a synthesized counterpart exists in ``wiki_index``,
+    merge its frontmatter (tags are unioned, other fields override) and replace
+    the body with the synthesized version.
+    """
+    merged: list[tuple[Path, dict[str, Any], str]] = []
+    for path, meta, body in sources:
+        rel_raw = str(path.relative_to(REPO_ROOT))
+        wiki_entry = wiki_index.get(rel_raw)
+        if wiki_entry:
+            wiki_path, wiki_meta, wiki_body = wiki_entry
+            merged_meta = dict(meta)
+            for key, val in wiki_meta.items():
+                if key == "tags" and isinstance(val, list) and isinstance(meta.get("tags"), list):
+                    merged_tags = list(dict.fromkeys(meta.get("tags", []) + val))
+                    merged_meta["tags"] = merged_tags
+                elif val not in (None, "", []):
+                    merged_meta[key] = val
+            merged.append((path, merged_meta, wiki_body))
+        else:
+            merged.append((path, meta, body))
+    return merged
+
+
+_WIKILINK_RE = re.compile(r"\[\[([^|\]]+)(?:\|([^|\]]+))?\]\]")
+
+
+def rewrite_wikilinks_to_md(
+    body: str,
+    slug_map: dict[str, str],
+) -> str:
+    """Convert ``[[Wikilink]]`` and ``[[Title|Wikilink]]`` into markdown links.
+
+    * If the slug exists in ``slug_map`` (mapping slug → project), link to the
+      session page at ``sessions/<project>/<slug>.html``.
+    * Otherwise render as an anchor placeholder.
+    """
+    def _replace(m: re.Match) -> str:
+        target = m.group(1).strip()
+        title = (m.group(2) or target).strip()
+        slug = target.replace(" ", "-").lower()
+        slug = re.sub(r"[^\w\-]", "", slug)
+        if slug in slug_map:
+            proj = slug_map[slug]
+            return f"[{title}](../../sessions/{proj}/{slug}.html)"
+        return f"[{title}](#wiki-{slug})"
+
+    return _WIKILINK_RE.sub(_replace, body)
+
+
 def group_by_project(
     sources: list[tuple[Path, dict[str, Any], str]],
 ) -> dict[str, list[tuple[Path, dict[str, Any], str]]]:
@@ -402,9 +482,9 @@ def _hljs_head_tags() -> str:
     )
 
 
-def page_head(title: str, description: str, css_prefix: str = "") -> str:
+def page_head(title: str, description: str, css_prefix: str = "", lang: str = "en") -> str:
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{html.escape(lang)}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -428,6 +508,7 @@ def page_head_article(
     canonical: str = "",
     date: str = "",
     metadata_comment: str = "",
+    lang: str = "en",
 ) -> str:
     """v0.4: Extended page head for session (Article) pages with schema.org
     microdata, canonical link, and an AI-readable metadata HTML comment."""
@@ -441,7 +522,7 @@ def page_head_article(
     if date:
         og_tags += f'  <meta property="article:published_time" content="{html.escape(date)}">\n'
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{html.escape(lang)}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -655,12 +736,16 @@ def render_session(
     body: str,
     out_dir: Path,
     project_slug: str,
+    slug_map: dict[str, str] | None = None,
+    lang: str = "en",
 ) -> Path:
     slug = meta.get("slug", path.stem)
     date = meta.get("date", "")
     title_raw = meta.get("title", f"Session: {slug}")
 
     body = strip_leading_h1(body)
+    if slug_map:
+        body = rewrite_wikilinks_to_md(body, slug_map)
     body_html = md_to_html(body)
     # #270: session transcripts often reference files the user had open
     # during the session (tasks.md, CLAUDE.md, convert.py, etc). Route
@@ -770,13 +855,14 @@ def render_session(
             canonical=f"{html_stem}.html",
             date=str(meta.get("started") or date),
             metadata_comment=metadata_comment,
+            lang=lang,
         )
         + nav_bar("sessions", link_prefix="../../")
         + hero(str(title_raw), meta_strip, size="hero-sm", subtitle_is_html=True)
         + f'<section class="section">\n  <div class="container">\n{breadcrumbs}\n{tools_preview}\n{actions_html}\n{tool_chart_block}\n{token_card_block}\n    <article class="content" itemscope itemtype="https://schema.org/Article">\n'
         + f'<meta itemprop="headline" content="{html.escape(str(title_raw))}">\n'
         + f'<meta itemprop="datePublished" content="{html.escape(str(meta.get("started") or date))}">\n'
-        + f'<meta itemprop="inLanguage" content="en">\n'
+        + f'<meta itemprop="inLanguage" content="{html.escape(lang)}">\n'
         + body_html
         + '\n    </article>\n  </div>\n</section>\n</main>\n'
         + page_foot(js_prefix="../../")
@@ -1715,26 +1801,42 @@ from llmwiki.render.js import JS  # noqa: F401 (re-exported)
 
 # ─── claude synthesis (optional) ───────────────────────────────────────────
 
+_OVERVIEW_PROMPT_PATH = REPO_ROOT / "wiki" / "prompts" / "overview.md"
+_DEFAULT_OVERVIEW_PROMPT = (
+    "You are writing a short (200-300 word) overview for a personal knowledge-base\n"
+    "landing page. Below is a JSON summary of the user's Claude Code session history\n"
+    "across multiple projects. Write 2-3 paragraphs of prose in markdown that:\n"
+    "  1. Names the main projects and what each is about (infer from session slugs and tool usage)\n"
+    "  2. Highlights the busiest project(s) and the overall scale of the work\n"
+    "  3. Is written in third person, referring to the user as 'the developer'\n"
+    "Do NOT use bullet points. Just 2-3 short paragraphs of prose.\n"
+    "\n"
+    "Data:\n"
+    "\n"
+    "{data}"
+)
+
+
+def _load_overview_prompt() -> str:
+    """Load the overview synthesis prompt. User override wins."""
+    if _OVERVIEW_PROMPT_PATH.is_file():
+        return _OVERVIEW_PROMPT_PATH.read_text(encoding="utf-8")
+    return _DEFAULT_OVERVIEW_PROMPT
+
+
 def synthesize_overview(
     groups: dict[str, list[tuple[Path, dict[str, Any], str]]],
     claude_path: str,
 ) -> Optional[str]:
     if not Path(claude_path).exists():
-        print(f"  warning: claude CLI not found at {claude_path}", file=sys.stderr)
+        print(
+            f"  note: claude CLI not found at {claude_path}. "
+            "Overview synthesis via --synthesize requires the claude CLI. "
+            "Consider running 'llmwiki synthesize' with a configured LLM backend instead.",
+            file=sys.stderr,
+        )
         return None
 
-    lines: list[str] = [
-        "You are writing a short (200-300 word) overview for a personal knowledge-base",
-        "landing page. Below is a JSON summary of the user's Claude Code session history",
-        "across multiple projects. Write 2-3 paragraphs of prose in markdown that:",
-        "  1. Names the main projects and what each is about (infer from session slugs and tool usage)",
-        "  2. Highlights the busiest project(s) and the overall scale of the work",
-        "  3. Is written in third person, referring to the user as 'the developer'",
-        "Do NOT use bullet points. Just 2-3 short paragraphs of prose.",
-        "",
-        "Data:",
-        "",
-    ]
     brief: dict[str, Any] = {}
     for project, sessions in sorted(groups.items()):
         brief[project] = {
@@ -1744,7 +1846,7 @@ def synthesize_overview(
             "models": sorted({str(m.get("model", "")) for _, m, _ in sessions if m.get("model")}),
             "slugs": [str(m.get("slug", p.stem)) for p, m, _ in sessions[:8]],
         }
-    prompt = "\n".join(lines) + json.dumps(brief, indent=2)
+    prompt = _load_overview_prompt().replace("{data}", json.dumps(brief, indent=2))
 
     print("  calling claude CLI for overview synthesis…")
     try:
@@ -1771,6 +1873,7 @@ def build_site(
     synthesize: bool = False,
     claude_path: str = "/usr/local/bin/claude",
     search_mode: str = "auto",
+    lang: str = "en",
 ) -> int:
     if not RAW_SESSIONS.exists():
         print(
@@ -1787,6 +1890,30 @@ def build_site(
     print(f"  found {len(sources)} source markdowns")
     groups = group_by_project(sources)
     print(f"  grouped into {len(groups)} projects")
+
+    # Merge synthesized wiki/sources/ overlays into raw sources
+    wiki_index = _build_wiki_sources_index()
+    if wiki_index:
+        print(f"  found {len(wiki_index)} synthesized wiki sources")
+        merged_sources: list[tuple[Path, dict[str, Any], str]] = []
+        for path, meta, body in sources:
+            rel_raw = str(path.relative_to(REPO_ROOT))
+            wiki_entry = wiki_index.get(rel_raw)
+            if wiki_entry:
+                wiki_path, wiki_meta, wiki_body = wiki_entry
+                merged_meta = dict(meta)
+                for key, val in wiki_meta.items():
+                    if key == "tags" and isinstance(val, list) and isinstance(meta.get("tags"), list):
+                        merged_tags = list(dict.fromkeys(meta.get("tags", []) + val))
+                        merged_meta["tags"] = merged_tags
+                    elif val not in (None, "", []):
+                        merged_meta[key] = val
+                merged_sources.append((path, merged_meta, wiki_body))
+            else:
+                merged_sources.append((path, meta, body))
+        sources = merged_sources
+        groups = group_by_project(sources)
+        print(f"  merged {len(wiki_index)} synthesized sources")
 
     # Reset output dir (clear contents only — the HTTP server may be cwd'd here)
     if out_dir.exists():
@@ -1806,12 +1933,24 @@ def build_site(
     (out_dir / "script.js").write_text(JS, encoding="utf-8")
     print("  wrote style.css, script.js")
 
-    # Copy raw markdown files for "Download .md" links
+    # Copy raw/synthesized markdown files for "Download .md" links
     sources_out = out_dir / "sources"
     if sources_out.exists():
         shutil.rmtree(sources_out)
-    shutil.copytree(RAW_SESSIONS, sources_out)
-    print(f"  copied raw .md sources to sources/")
+    sources_out.mkdir(parents=True)
+    for path, meta, _body in sources:
+        project = str(meta.get("project") or path.parent.name)
+        dest_dir = sources_out / project
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir / path.name
+        rel_raw = str(path.relative_to(REPO_ROOT))
+        wiki_entry = wiki_index.get(rel_raw)
+        if wiki_entry:
+            wiki_path, _, _ = wiki_entry
+            shutil.copy2(wiki_path, dest_path)
+        else:
+            shutil.copy2(path, dest_path)
+    print(f"  copied raw/synthesized .md sources to sources/")
 
     # v0.7 (#96): copy downloaded image assets into site/assets/
     raw_assets = RAW_DIR / "assets"
@@ -1830,11 +1969,18 @@ def build_site(
         if synthesis:
             print(f"  synthesis: {len(synthesis)} chars")
 
+    # Build slug → project map for wikilink resolution
+    slug_map: dict[str, str] = {}
+    for path, meta, _body in sources:
+        project = str(meta.get("project") or path.parent.name)
+        slug = str(meta.get("slug", path.stem))
+        slug_map[slug] = project
+
     # Render pages
     n_sessions = 0
     for path, meta, body in sources:
         project = str(meta.get("project") or path.parent.name)
-        render_session(path, meta, body, out_dir, project)
+        render_session(path, meta, body, out_dir, project, slug_map=slug_map, lang=lang)
         n_sessions += 1
     print(f"  wrote {n_sessions} session pages")
 
@@ -1938,6 +2084,18 @@ def build_site(
 
     total_files = sum(1 for _ in out_dir.rglob("*.html"))
     total_bytes = sum(p.stat().st_size for p in out_dir.rglob("*") if p.is_file())
+    # i18n: update HTML lang attributes if non-default
+    if lang != "en":
+        for html_path in out_dir.rglob("*.html"):
+            try:
+                text = html_path.read_text(encoding="utf-8")
+                text = text.replace('<html lang="en"', f'<html lang="{html.escape(lang)}"')
+                text = text.replace('content="en"', f'content="{html.escape(lang)}"')
+                html_path.write_text(text, encoding="utf-8")
+            except OSError:
+                pass
+        print(f"  updated lang={lang} on {total_files} HTML files")
+
     print(
         f"==> build complete: {total_files} HTML files, {total_bytes / 1024:.0f} KB total"
     )

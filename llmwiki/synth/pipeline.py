@@ -61,6 +61,8 @@ def resolve_backend(
     Supported values:
       - ``"dummy"`` (default) — canned offline backend for previews/tests
       - ``"ollama"`` — local Ollama HTTP backend (#35)
+      - ``"openai"`` — OpenAI-compatible HTTP backend (llama-server,
+        vLLM, TGI, etc.). Uses ``/v1/chat/completions``.
       - ``"agent"`` — defer to the running Claude Code / Codex CLI
         agent (#316). Writes pending prompts to
         ``.llmwiki-pending-prompts/`` for the slash-command layer to
@@ -78,6 +80,12 @@ def resolve_backend(
         from llmwiki.synth.ollama import OllamaSynthesizer, load_ollama_config
 
         return OllamaSynthesizer(config=load_ollama_config(cfg))
+
+    if name in {"openai", "openai_compat", "openai-compat"}:
+        # OpenAI-compatible backend — works with llama-server, vLLM, TGI, etc.
+        from llmwiki.synth.openai_compat import OpenAISynthesizer, load_openai_config
+
+        return OpenAISynthesizer(config=load_openai_config(cfg))
 
     if name in {"agent", "agent_delegate", "agent-delegate"}:
         # Imported lazily — the agent backend is a thin file-I/O layer
@@ -107,10 +115,23 @@ PROMPT_TEMPLATE_PATH = Path(__file__).parent / "prompts" / "source_page.md"
 USER_PROMPT_OVERRIDE = REPO_ROOT / "wiki" / "prompts" / "source_page.md"
 
 
-def _load_prompt_template() -> str:
-    """Load the synthesis prompt template. User override wins."""
+def _load_prompt_template(cfg: Optional[dict[str, Any]] = None) -> str:
+    """Load the synthesis prompt template.
+
+    Priority:
+    1. User override: wiki/prompts/source_page.md (if exists)
+    2. Built-in i18n: llmwiki/i18n/prompts/{lang}/source_page.md
+    3. Legacy built-in: llmwiki/synth/prompts/source_page.md
+    """
     if USER_PROMPT_OVERRIDE.is_file():
         return USER_PROMPT_OVERRIDE.read_text(encoding="utf-8")
+    lang = (cfg or {}).get("language", "en")
+    if lang != "en":
+        i18n_path = (
+            REPO_ROOT / "llmwiki" / "i18n" / "prompts" / lang / "source_page.md"
+        )
+        if i18n_path.is_file():
+            return i18n_path.read_text(encoding="utf-8")
     return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
@@ -549,6 +570,7 @@ def synthesize_new_sessions(
     dry_run: bool = False,
     force: bool = False,
     log_path: Optional[Path] = None,
+    config: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Main entry point. Returns a summary dict:
 
@@ -575,7 +597,7 @@ def synthesize_new_sessions(
         }
 
     sources_out = wiki_sources_dir or WIKI_SOURCES
-    prompt_template = _load_prompt_template()
+    prompt_template = _load_prompt_template(config)
     state = {} if force else _load_state()
     sessions = _discover_raw_sessions(raw_dir)
 
